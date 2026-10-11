@@ -1,0 +1,116 @@
+{
+  "schema_version": "1.0",
+  "description": "Controlled positive and negative fixtures for MVP classification and ranking",
+  "observations": [
+    {
+      "url": "https://example-authorized.test/backup.zip",
+      "status": 200,
+      "content_type": "application/zip",
+      "body": "PK\u0003\u0004synthetic-archive-header-not-a-real-secret",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture",
+      "scope_decision": "IN_SCOPE"
+    },
+    {
+      "url": "https://example-authorized.test/",
+      "status": 200,
+      "content_type": "text/html",
+      "body": "<!DOCTYPE html><html><body><div id=\"root\"></div><script>You need to enable JavaScript to run this app.</script></body></html>",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/missing",
+      "status": 404,
+      "content_type": "text/html",
+      "body": "404 Not Found",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/admin/trace.axd",
+      "status": 200,
+      "content_type": "text/html",
+      "body": "<html><title>Application Trace</title><h1>Trace Information</h1><p>Request Details</p></html>",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/login",
+      "status": 200,
+      "content_type": "text/html",
+      "body": "<form action=\"/login\" method=\"post\"><input name=\"password\" type=\"password\"/></form>",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/old-backup.zip",
+      "status": 404,
+      "content_type": "text/html",
+      "body": "Not Found",
+      "discovery_mode": "HISTORICAL",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture",
+      "source_url": "https://web.archive.org/example"
+    },
+    {
+      "url": "https://example-authorized.test/.env",
+      "status": 200,
+      "content_type": "text/plain",
+      "body": "API_KEY=supersecretvalue12345\nDEBUG=true\n",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/empty",
+      "status": 200,
+      "content_type": "text/plain",
+      "body": "",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/cdn-cgi/challenge",
+      "status": 403,
+      "content_type": "text/html",
+      "body": "Attention Required! | Cloudflare",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/notes",
+      "status": 200,
+      "content_type": "text/html",
+      "body": "<html><body><h1>Public notes</h1><p>Hello world</p></body></html>",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/config.yml",
+      "status": 200,
+      "content_type": "text/html",
+      "body": "<html><body>ok</body></html>",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/research-copy",
+      "status": 200,
+      "content_type": "text/plain",
+      "body": "Someone said there might be a backup here",
+      "discovery_mode": "PASSIVE_INDEX",
+      "source_fidelity": "AI_INFERENCE",
+      "provider": "fixture"
+    }
+  ]
+}
