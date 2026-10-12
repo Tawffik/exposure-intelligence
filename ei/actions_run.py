@@ -17,6 +17,7 @@ from ei.report import write_report_bundle
 from ei.research import run_research
 from ei.store import ResearchStore
 from ei.validate_input import sanitize_target_input, validate_budget
+from ei.providers.github_code_search import build_target_scoped_query
 
 
 def build_profile_for_target(
@@ -134,6 +135,11 @@ def run_actions_job(
     store = ResearchStore(db_path)
     data_label = "unknown"
     try:
+        # Always bind GitHub query to the selected target host.
+        scoped_query = build_target_scoped_query(tv.host, github_query if github_query else "")
+        requested_limit = budget
+        effective_limit = budget
+
         if mode == "demo":
             data_label = "demo_fixtures_only"
             result = run_research(
@@ -142,26 +148,33 @@ def run_actions_job(
                 fixture_path=root / "examples" / "sample_observations.json",
                 github_fixture=root / "examples" / "github_code_search_sample.json",
                 allow_live_github=False,
+                max_results=effective_limit,
+                target_host=tv.host,
+            )
+            result["note"] = (
+                (result.get("note") or "")
+                + " DEMO/FIXTURE mode — not live research. "
+                + f"Requested/effective max_results={requested_limit}."
             )
         else:
-            # Production-style passive: live GitHub if token present; else NOT_CONFIGURED for GH
             token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
             if token:
                 data_label = "live_github_code_search"
-                # collect_live uses per_page; query from operator
                 result = run_research(
                     profile,
                     store=store,
                     fixture_path=None,
                     github_fixture=None,
-                    github_live_query=github_query,
+                    github_live_query=github_query or "filename:.env OR extension:map",
                     allow_live_github=True,
+                    max_results=effective_limit,
+                    target_host=tv.host,
                 )
-                # Soft-limit: research pipeline doesn't re-query; provider already bounded by API per_page default 10
-                # Adjust note with budget
                 result["note"] = (
                     (result.get("note") or "")
-                    + f" GitHub query budget per_page≤{budget}."
+                    + f" Live GitHub index query (target-scoped). "
+                    + f"requested_max_results={requested_limit} effective_max_results={effective_limit}. "
+                    + f"query={scoped_query[:180]}"
                 )
             else:
                 data_label = "github_not_configured"
@@ -171,8 +184,9 @@ def run_actions_job(
                     fixture_path=None,
                     github_fixture=None,
                     allow_live_github=False,
+                    max_results=effective_limit,
+                    target_host=tv.host,
                 )
-                # Explicit provider row if none
                 if not result.get("provider_summaries"):
                     result["provider_summaries"] = [
                         {
@@ -181,11 +195,17 @@ def run_actions_job(
                             "error_summary": "GITHUB_TOKEN not available in environment.",
                             "records_received": 0,
                             "records_normalized": 0,
-                            "coverage_notes": "Set repository secret GITHUB_TOKEN to enable live index search.",
+                            "coverage_notes": (
+                                "Set repository secret EI_GITHUB_TOKEN (or GITHUB_TOKEN) "
+                                "to enable live index search. Queries are target-scoped."
+                            ),
                         }
                     ]
                     if result.get("status") in (None, "COMPLETED_ZERO", "NOT_RUN"):
                         result["status"] = "NOT_CONFIGURED"
+        result["requested_max_results"] = requested_limit
+        result["effective_max_results"] = effective_limit
+        result["scoped_github_query"] = scoped_query if mode != "demo" else "(demo fixtures)"
     finally:
         store.close()
 

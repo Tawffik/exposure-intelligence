@@ -21,7 +21,11 @@ from ei.models import (
 )
 from ei.pipeline import load_fixture_file, run_pipeline
 from ei.profile import ProgramProfile, assess_relevance, live_request_permitted, validate_profile
-from ei.providers.github_code_search import GitHubCodeSearchProvider, ProviderCollectResult
+from ei.providers.github_code_search import (
+    GitHubCodeSearchProvider,
+    ProviderCollectResult,
+    build_target_scoped_query_variants,
+)
 from ei.ranker import observations_to_candidates
 from ei.store import ResearchStore
 
@@ -35,8 +39,20 @@ def _annotate_relevance(records: list[dict[str, Any]], profile: ProgramProfile) 
         meta["scope_relevance"] = rel["relevance"]
         meta["scope_reason"] = rel["reason"]
         meta["live_allowed"] = rel["live_allowed"]
+        # Provider may already set target_relationship (e.g. GitHub index)
+        if "target_relationship" not in meta:
+            # Map host scope labels to relationship vocabulary
+            mapping = {
+                "IN_SCOPE": "DIRECT_TARGET_REFERENCE",
+                "OUT_OF_SCOPE": "OUT_OF_SCOPE",
+                "PUBLIC_INDEX": "INDEX_ONLY",
+                "UNATTRIBUTED": "UNATTRIBUTED",
+                "UNKNOWN": "UNATTRIBUTED",
+            }
+            meta["target_relationship"] = mapping.get(rel["relevance"], "UNATTRIBUTED")
+            meta["target_relationship_rationale"] = rel["reason"]
+        # For PUBLIC_INDEX hosts, never elevate scope_decision to IN_SCOPE
         r["metadata"] = meta
-        # Do not overwrite IN_SCOPE from fixture; set when UNKNOWN/missing
         if r.get("scope_decision") in (None, "", "UNKNOWN"):
             r["scope_decision"] = rel["relevance"]
         out.append(r)
@@ -114,6 +130,8 @@ def run_research(
     github_fixture: Optional[Path] = None,
     github_live_query: Optional[str] = None,
     allow_live_github: bool = False,
+    max_results: int = 10,
+    target_host: str = "",
 ) -> dict[str, Any]:
     """
     End-to-end operational run.
@@ -169,7 +187,7 @@ def run_research(
     gh = GitHubCodeSearchProvider()
     gh_result: Optional[ProviderCollectResult] = None
     if github_fixture is not None:
-        gh_result = gh.collect_from_fixture(github_fixture)
+        gh_result = gh.collect_from_fixture(github_fixture, target_host=target_host or (profile.in_scope_hosts[0] if profile.in_scope_hosts else ""))
     elif allow_live_github and github_live_query:
         if "PASSIVE_INDEX" not in profile.allowed_operations:
             gh_result = ProviderCollectResult(
@@ -178,7 +196,20 @@ def run_research(
                 query=github_live_query or "",
             )
         else:
-            gh_result = gh.collect_live(github_live_query)
+            host_for_q = target_host or (profile.in_scope_hosts[0] if profile.in_scope_hosts else "")
+            if host_for_q:
+                variants = build_target_scoped_query_variants(host_for_q, github_live_query or "", limit=4)
+                gh_result = gh.collect_live_multi(
+                    variants,
+                    per_page=max(1, min(int(max_results), 30)),
+                    max_total=max(1, min(int(max_results), 30)),
+                    target_host=host_for_q,
+                )
+            else:
+                gh_result = gh.collect_live(
+                    github_live_query or "",
+                    per_page=max(1, min(int(max_results), 30)),
+                )
     elif allow_live_github and not github_live_query:
         gh_result = ProviderCollectResult(
             status=RunStatus.ERROR.value,
@@ -190,7 +221,14 @@ def run_research(
             RunStatus.COMPLETED_WITH_RESULTS.value,
             RunStatus.PARTIAL.value,
         ):
-            annotated = _annotate_relevance(gh_result.records, profile)
+            # Enforce effective max_results on provider output
+            limited = list(gh_result.records)[: max(1, min(int(max_results), 30))]
+            if len(gh_result.records) > len(limited):
+                gh_result.coverage_notes = (
+                    (gh_result.coverage_notes or "")
+                    + f" Truncated to max_results={len(limited)} (had {len(gh_result.records)})."
+                )
+            annotated = _annotate_relevance(limited, profile)
             all_records.extend(annotated)
         provider_summaries.append(
             ProviderRunSummary(

@@ -88,8 +88,9 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           mkdir -p ei_data artifacts
+          set +e
           python -m ei.cli actions-run \
             --target "${EI_TARGET}" \
             --mode "${EI_MODE}" \
@@ -100,6 +101,21 @@ jobs:
             --out artifacts \
             --commit-sha "${GITHUB_SHA}" \
             --workflow-run-id "${GITHUB_RUN_ID}"
+          rc=$?
+          set -e
+          echo "actions-run_exit_code=${rc}" >> "$GITHUB_OUTPUT"
+          # 0 = completed with results/zero; 3 = partial/rate-limit/not-configured (honest non-success)
+          # 2 = invalid input — fail the job; 1 = hard ERROR
+          if [ "$rc" -eq 2 ]; then
+            echo "Invalid target/input (exit 2)"
+            exit 2
+          fi
+          if [ "$rc" -eq 1 ]; then
+            echo "Research hard ERROR (exit 1) — artifacts still uploaded in always() step"
+            exit 1
+          fi
+          # 0 or 3: continue so summary+artifacts always run; status is in run-metadata.json
+          exit 0
 
       - name: Job summary
         if: always()

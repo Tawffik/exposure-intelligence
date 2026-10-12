@@ -204,7 +204,7 @@ def write_report_bundle(
         f"- Potentially sensitive (classifier): **{summary.get('potentially_sensitive', 0)}**",
         f"- Not in latest run: **{summary.get('not_in_latest_run', 0)}**",
         "",
-        "Public GitHub / index leads are **research leads**, not confirmed production vulnerabilities.",
+        "Public GitHub / index leads are **research leads**, not confirmed production vulnerabilities.\nRelationship labels: DIRECT_TARGET_REFERENCE, RELATED_CANDIDATE, INDEX_ONLY, UNATTRIBUTED, OUT_OF_SCOPE — never VERIFIED_DISCLOSURE from index alone.",
         "Live verification was "
         + (
             "**not performed** against application hosts."
@@ -248,6 +248,52 @@ def write_report_bundle(
     paths["report.md"] = p_rep
 
     # full result snapshot (redaction already applied upstream in observations)
+
+    # --- provider-status.json ---
+    p_ps = out_dir / "provider-status.json"
+    p_ps.write_text(json.dumps({"providers": providers}, indent=2), encoding="utf-8")
+    paths["provider-status.json"] = p_ps
+
+    # --- coverage.json ---
+    cov_obj = {
+        "status": result.get("status"),
+        "data_source_label": data_source_label,
+        "requested_max_results": result.get("requested_max_results"),
+        "effective_max_results": result.get("effective_max_results"),
+        "scoped_github_query": result.get("scoped_github_query"),
+        "live_host_requests": result.get("live_host_requests", 0),
+        "providers": [
+            {
+                "provider": p.get("provider"),
+                "status": p.get("status"),
+                "records_received": p.get("records_received"),
+                "records_normalized": p.get("records_normalized"),
+                "error_summary": p.get("error_summary"),
+                "coverage_notes": p.get("coverage_notes"),
+            }
+            for p in providers
+        ],
+        "blind_spots": [
+            "GitHub index coverage is partial and rate-limited; first page only.",
+            "Public index presence is not current-state verification.",
+            "Actions cache history is best-effort, not durable storage.",
+        ],
+    }
+    p_cv = out_dir / "coverage.json"
+    p_cv.write_text(json.dumps(cov_obj, indent=2), encoding="utf-8")
+    paths["coverage.json"] = p_cv
+
+    # --- errors.json ---
+    errs = []
+    for p in providers:
+        if p.get("status") not in ("COMPLETED_WITH_RESULTS", "COMPLETED_ZERO", None, ""):
+            errs.append({"provider": p.get("provider"), "status": p.get("status"), "error": p.get("error_summary")})
+    if result.get("error"):
+        errs.append({"error": result.get("error"), "details": result.get("details")})
+    p_er = out_dir / "errors.json"
+    p_er.write_text(json.dumps({"errors": errs, "warnings": []}, indent=2), encoding="utf-8")
+    paths["errors.json"] = p_er
+
     p_full = out_dir / "research-result.json"
     p_full.write_text(json.dumps(result, indent=2), encoding="utf-8")
     paths["research-result.json"] = p_full

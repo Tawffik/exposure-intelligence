@@ -12,7 +12,7 @@ This repository is the implementation of the [Exposure Intelligence project char
 - **Explainable classification and ranking** — scores come with reason codes; an exposed artifact is not automatically a vulnerability.
 - **Safety first** — offline fixtures by default; secrets are redacted; no live probing without separate authorization policy (not enabled in MVP).
 
-## Status (v0.1.4)
+## Status (v0.1.5)
 
 | Capability | Status |
 | --- | --- |
@@ -99,7 +99,7 @@ python -m ei.cli actions-run --target example.com --mode demo --out artifacts --
 
 History across Actions runs uses a best-effort cache of `ei_data/` (not guaranteed durable). Reports never treat cache miss as a clean negative.
 
-## Operational workflow (v0.1.4)
+## Operational workflow (v0.1.5)
 
 ```bash
 # 1. Validate program profile

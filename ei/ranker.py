@@ -116,6 +116,26 @@ def score_candidate(primary: Observation, group: list[Observation]) -> tuple[flo
     if multi_source:
         explanation.append(f"multi_provider_bonus={multi_source:.2f}")
     explanation.append(f"class={primary.classification}")
+
+    # Target-relationship penalties: public-index / unattributed leads stay visible but lower
+    md = primary.metadata or {}
+    nested = md.get("metadata") if isinstance(md.get("metadata"), dict) else {}
+    rel = md.get("target_relationship") or nested.get("target_relationship") or ""
+    scope = primary.scope_decision or ""
+    if rel in {"INDEX_ONLY", "UNATTRIBUTED"} or scope in {"PUBLIC_INDEX", "UNATTRIBUTED"}:
+        score *= 0.55
+        explanation.append(
+            f"relationship_penalty rel={rel or scope} (index/unattributed ≠ target finding)"
+        )
+    elif rel == "RELATED_CANDIDATE":
+        score *= 0.75
+        explanation.append("relationship_penalty RELATED_CANDIDATE")
+    elif scope == "OUT_OF_SCOPE" or rel == "OUT_OF_SCOPE":
+        score *= 0.15
+        explanation.append("out_of_scope_penalty")
+    elif rel == "DIRECT_TARGET_REFERENCE" or scope == "IN_SCOPE":
+        explanation.append("target_relationship=DIRECT_OR_IN_SCOPE")
+
     return round(min(1.0, score), 4), explanation
 
 
