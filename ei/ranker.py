@@ -120,6 +120,29 @@ def score_candidate(primary: Observation, group: list[Observation]) -> tuple[flo
 
 
 def _impact_hypothesis(obs: Observation) -> str:
+    reasons = set(obs.classification_reason_codes or [])
+    if "directory_listing_fingerprint" in reasons:
+        return (
+            "Directory listing may reveal file/layout information; "
+            "individual object sensitivity and impact not confirmed."
+        )
+    if "source_map_with_sources_content" in reasons:
+        return (
+            "Source map embeds original sources; may disclose application logic or secrets. "
+            "Impact not independently verified."
+        )
+    if "source_map_structure" in reasons:
+        return "Source map present; build paths may leak. Sensitive source content not confirmed."
+    if "openapi_or_swagger_schema" in reasons:
+        return (
+            "Public API schema may reveal routes and models; "
+            "not proof of broken authorization or data exposure."
+        )
+    if "git_metadata_exposure" in reasons:
+        return (
+            "Git metadata exposure may enable further source recovery; "
+            "full repository disclosure not demonstrated from this observation alone."
+        )
     if obs.classification == Classification.POTENTIALLY_SENSITIVE.value:
         return (
             "Artifact may expose sensitive material; existence/accessibility observed, "

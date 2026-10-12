@@ -122,3 +122,88 @@ def test_public_html():
         body="<html><body><h1>About</h1></body></html>",
     )
     assert c == Classification.INTENTIONALLY_PUBLIC.value
+
+
+def test_directory_listing_not_public_noise():
+    """Regression: directory listings must not be INTENTIONALLY_PUBLIC / noise."""
+    c, reasons, conf, _, sens, _ = classify_observation(
+        url="https://t.example/files/",
+        status=200,
+        content_type="text/html",
+        body='<title>Index of /files/</title><h1>Index of /files/</h1><a href="backup.zip">backup.zip</a>',
+    )
+    assert c == Classification.POTENTIALLY_SENSITIVE.value
+    assert "directory_listing_fingerprint" in reasons
+    assert c != Classification.INTENTIONALLY_PUBLIC.value
+    assert sens in ("MEDIUM", "HIGH")
+    assert conf >= 0.7
+
+
+def test_source_map_with_sources_content():
+    body = (
+        '{"version":3,"file":"app.js","sources":["webpack:///src/app.js"],'
+        '"mappings":"AAAA","sourcesContent":["const x=1"]}'
+    )
+    c, reasons, conf, _, sens, _ = classify_observation(
+        url="https://t.example/static/app.js.map",
+        status=200,
+        content_type="application/json",
+        body=body,
+    )
+    assert c == Classification.POTENTIALLY_SENSITIVE.value
+    assert "source_map_with_sources_content" in reasons
+    assert sens == "HIGH"
+    assert conf >= 0.8
+
+
+def test_source_map_without_sources_content_retained():
+    body = '{"version":3,"file":"vendor.js","sources":["a.js"],"mappings":"AAAA"}'
+    c, reasons, conf, _, sens, _ = classify_observation(
+        url="https://t.example/static/vendor.js.map",
+        status=200,
+        content_type="application/json",
+        body=body,
+    )
+    assert c == Classification.IMPACT_UNPROVEN.value
+    assert "source_map_structure" in reasons
+    assert sens == "MEDIUM"
+    assert conf >= 0.6
+
+
+def test_openapi_schema_is_lead_not_noise():
+    body = '{"openapi":"3.0.0","info":{"title":"API"},"paths":{"/x":{"get":{}}}}'
+    c, reasons, conf, _, sens, _ = classify_observation(
+        url="https://t.example/openapi.json",
+        status=200,
+        content_type="application/json",
+        body=body,
+    )
+    assert c == Classification.IMPACT_UNPROVEN.value
+    assert "openapi_or_swagger_schema" in reasons
+    assert sens == "MEDIUM"
+
+
+def test_git_head_exposure():
+    c, reasons, conf, _, sens, _ = classify_observation(
+        url="https://t.example/.git/HEAD",
+        status=200,
+        content_type="text/plain",
+        body="ref: refs/heads/main\n",
+    )
+    assert c == Classification.POTENTIALLY_SENSITIVE.value
+    assert "git_metadata_exposure" in reasons
+    assert sens == "HIGH"
+
+
+def test_benign_json_still_unclassified():
+    """Counterexample: ordinary JSON must not become source-map or OpenAPI."""
+    c, reasons, _, _, _, _ = classify_observation(
+        url="https://t.example/api/health",
+        status=200,
+        content_type="application/json",
+        body='{"status":"ok","uptime":12}',
+    )
+    assert c == Classification.IMPACT_UNPROVEN.value
+    assert "json_response_unclassified" in reasons
+    assert "source_map_structure" not in reasons
+    assert "openapi_or_swagger_schema" not in reasons

@@ -12,7 +12,7 @@ This repository is the implementation of the [Exposure Intelligence project char
 - **Explainable classification and ranking** — scores come with reason codes; an exposed artifact is not automatically a vulnerability.
 - **Safety first** — offline fixtures by default; secrets are redacted; no live probing without separate authorization policy (not enabled in MVP).
 
-## MVP status (v0.1.0)
+## Status (v0.1.1)
 
 | Capability | Status |
 | --- | --- |
@@ -21,12 +21,13 @@ This repository is the implementation of the [Exposure Intelligence project char
 | Source-fidelity labels | Implemented |
 | Honest run states | Implemented |
 | Deterministic content-shape classifier | Implemented + tested |
+| Source maps / directory listings / OpenAPI / git metadata shapes | Implemented + tested (v0.1.1) |
 | Provenance + redaction | Implemented + tested |
 | Correlation + explainable ranking | Implemented + tested |
 | Automated tests + CI workflow | Implemented |
-| Live providers (GitHub search, URLScan, CDX) | Not in MVP |
-| Target authorization registry / active probes | Not in MVP |
-| Persistent store / scheduler | Not in MVP |
+| Live providers (GitHub search, URLScan, CDX) | Not yet |
+| Target authorization registry / active probes | Not yet |
+| Persistent store / scheduler | Not yet |
 
 ## Requirements
 

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "description": "Controlled positive and negative fixtures for MVP classification and ranking",
+  "description": "Controlled positive and negative fixtures for classification and ranking (includes source maps, directory listings, OpenAPI, git metadata)",
   "observations": [
     {
       "url": "https://example-authorized.test/backup.zip",
@@ -110,6 +110,61 @@
       "body": "Someone said there might be a backup here",
       "discovery_mode": "PASSIVE_INDEX",
       "source_fidelity": "AI_INFERENCE",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/static/app.js.map",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"version\":3,\"file\":\"app.js\",\"sources\":[\"webpack:///src/app.js\"],\"mappings\":\"AAAA\",\"sourcesContent\":[\"const apiKey = process.env.KEY;\"]}",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture",
+      "scope_decision": "IN_SCOPE"
+    },
+    {
+      "url": "https://example-authorized.test/static/vendor.js.map",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"version\":3,\"file\":\"vendor.js\",\"sources\":[\"node_modules/x/index.js\"],\"mappings\":\"AAAA\"}",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/files/",
+      "status": 200,
+      "content_type": "text/html",
+      "body": "<html><head><title>Index of /files/</title></head><body><h1>Index of /files/</h1><pre><a href=\"backup.zip\">backup.zip</a>\n<a href=\"notes.txt\">notes.txt</a></pre></body></html>",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/openapi.json",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"Internal API\"},\"paths\":{\"/admin/users\":{\"get\":{\"summary\":\"List users\"}}}}",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/.git/HEAD",
+      "status": 200,
+      "content_type": "text/plain",
+      "body": "ref: refs/heads/main\n",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
+      "provider": "fixture"
+    },
+    {
+      "url": "https://example-authorized.test/about",
+      "status": 200,
+      "content_type": "text/html",
+      "body": "<html><body><h1>About us</h1><p>Public company page.</p></body></html>",
+      "discovery_mode": "CURRENT_OBSERVATION",
+      "source_fidelity": "ORIGINAL",
       "provider": "fixture"
     }
   ]

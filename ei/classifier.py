@@ -52,10 +52,78 @@ TRACE_MARKERS = [
     re.compile(r"Trace Information", re.I),
     re.compile(r"Request Details", re.I),
 ]
+DIRECTORY_LISTING_MARKERS = [
+    re.compile(r"<title>\s*Index of\s+/", re.I),
+    re.compile(r"<h1>\s*Index of\s+/", re.I),
+    re.compile(r"\[To Parent Directory\]", re.I),
+    re.compile(r"<pre>(?:\s*<a href=)", re.I),
+    re.compile(r"Directory Listing For", re.I),
+]
+SOURCE_MAP_MARKERS = [
+    re.compile(r'"version"\s*:\s*3\b'),
+    re.compile(r'"mappings"\s*:'),
+    re.compile(r'"sources"\s*:\s*\['),
+]
+SOURCE_MAP_SOURCES_CONTENT = re.compile(r'"sourcesContent"\s*:\s*\[')
+OPENAPI_MARKERS = [
+    re.compile(r'"openapi"\s*:\s*"3\.'),
+    re.compile(r'"swagger"\s*:\s*"2\.'),
+    re.compile(r'"paths"\s*:\s*\{'),
+    re.compile(r'"info"\s*:\s*\{[^}]*"title"', re.I),
+]
+GIT_METADATA_MARKERS = [
+    re.compile(r"^ref:\s*refs/", re.M),
+    re.compile(r"^\[core\]\s*$", re.M),
+    re.compile(r"repositoryformatversion\s*="),
+    re.compile(r"^\[remote \"origin\"\]", re.M),
+]
+GIT_PATH_HINT = re.compile(r"(?i)/\.git(/|$)")
 
 
 def _matches_any(text: str, patterns: list[re.Pattern]) -> bool:
     return any(p.search(text) for p in patterns)
+
+
+def _is_source_map(body: str, url: str, content_type: str) -> bool:
+    url_l = (url or "").lower()
+    ct = (content_type or "").lower()
+    if url_l.endswith(".map") or "sourcemap" in ct or "source-map" in ct:
+        # Path/type hint alone is weak; require at least one structural marker when body present
+        if body.strip() and _matches_any(body, SOURCE_MAP_MARKERS):
+            return True
+        if not body.strip() and url_l.endswith(".map"):
+            return True
+    return bool(body.strip() and _matches_any(body, SOURCE_MAP_MARKERS) and '"mappings"' in body)
+
+
+def _is_openapi(body: str, url: str) -> bool:
+    url_l = (url or "").lower()
+    path_hint = any(x in url_l for x in ("openapi", "swagger", "api-docs", "api/docs"))
+    if not body.strip():
+        return False
+    has_spec = bool(
+        re.search(r'"openapi"\s*:\s*"3\.', body) or re.search(r'"swagger"\s*:\s*"2\.', body)
+    )
+    has_paths = bool(re.search(r'"paths"\s*:\s*\{', body))
+    if has_spec and has_paths:
+        return True
+    if path_hint and (has_spec or has_paths):
+        return True
+    return False
+
+
+def _is_git_metadata(body: str, url: str) -> bool:
+    if not body.strip():
+        return False
+    url_l = (url or "").lower()
+    if GIT_PATH_HINT.search(url_l) and _matches_any(body, GIT_METADATA_MARKERS):
+        return True
+    # Body-only: strong git markers without requiring path
+    if re.search(r"^ref:\s*refs/heads/", body, re.M) and len(body.strip()) < 200:
+        return True
+    if re.search(r"^\[core\]", body, re.M) and "repositoryformatversion" in body:
+        return True
+    return False
 
 
 def classify_observation(
@@ -191,6 +259,66 @@ def classify_observation(
             ["diagnostic_trace_page"],
             0.8,
             "Diagnostic/trace page structure detected; impact unconfirmed.",
+            SensitivityClass.HIGH.value,
+            freshness,
+        )
+
+    # Directory listing — must run before generic public-HTML classification.
+    # Previously these were labeled INTENTIONALLY_PUBLIC and ranked as noise.
+    if status in (None, 200) and body.strip() and _matches_any(body, DIRECTORY_LISTING_MARKERS):
+        sens = SensitivityClass.MEDIUM.value
+        listing_reasons = ["directory_listing_fingerprint"]
+        if SENSITIVE_PATH_HINTS.search(body) or SENSITIVE_PATH_HINTS.search(url_l):
+            listing_reasons.append("listing_contains_sensitive_name_hint")
+            sens = SensitivityClass.HIGH.value
+        return (
+            Classification.POTENTIALLY_SENSITIVE.value,
+            listing_reasons,
+            0.78,
+            "Directory listing response; may reveal filesystem layout. Impact not confirmed.",
+            sens,
+            freshness,
+        )
+
+    # Source maps (build artifact disclosure)
+    if status in (None, 200) and _is_source_map(body, url_l, ct):
+        has_sources = bool(SOURCE_MAP_SOURCES_CONTENT.search(body or ""))
+        if has_sources:
+            return (
+                Classification.POTENTIALLY_SENSITIVE.value,
+                ["source_map_with_sources_content"],
+                0.82,
+                "Source map includes sourcesContent; original source may be embedded. Impact unconfirmed.",
+                SensitivityClass.HIGH.value,
+                freshness,
+            )
+        return (
+            Classification.IMPACT_UNPROVEN.value,
+            ["source_map_structure"],
+            0.65,
+            "Source map structure observed; paths/build layout may leak. Sensitive content not confirmed.",
+            SensitivityClass.MEDIUM.value,
+            freshness,
+        )
+
+    # OpenAPI / Swagger public schema
+    if status in (None, 200) and _is_openapi(body, url_l):
+        return (
+            Classification.IMPACT_UNPROVEN.value,
+            ["openapi_or_swagger_schema"],
+            0.6,
+            "Public API schema document; may reveal internal routes/models. Not proof of authorization failure.",
+            SensitivityClass.MEDIUM.value,
+            freshness,
+        )
+
+    # Exposed git metadata (.git/HEAD, config, etc.)
+    if status in (None, 200) and _is_git_metadata(body, url_l):
+        return (
+            Classification.POTENTIALLY_SENSITIVE.value,
+            ["git_metadata_exposure"],
+            0.8,
+            "Git metadata content observed; repository structure may be exposed. Full source impact unconfirmed.",
             SensitivityClass.HIGH.value,
             freshness,
         )

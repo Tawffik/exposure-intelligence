@@ -27,6 +27,40 @@ def test_demo_fixture_runs_with_results():
     assert top.rank_score >= report.candidates[-1].rank_score
 
 
+def test_directory_listing_not_ranked_as_noise():
+    """Regression: listing must retain as a reviewable candidate, not public noise."""
+    report = run_pipeline(
+        [
+            {
+                "url": "https://t.example/files/",
+                "status": 200,
+                "content_type": "text/html",
+                "body": "<title>Index of /files/</title><h1>Index of /files/</h1>",
+                "discovery_mode": "CURRENT_OBSERVATION",
+            },
+            {
+                "url": "https://t.example/",
+                "status": 200,
+                "content_type": "text/html",
+                "body": '<div id="root"></div>You need to enable JavaScript',
+            },
+        ]
+    )
+    by_url = {c.primary_url: c for c in report.candidates}
+    listing = by_url["https://t.example/files/"]
+    spa = by_url["https://t.example/"]
+    assert listing.classification == "POTENTIALLY_SENSITIVE"
+    assert listing.rank_score > spa.rank_score
+
+
+def test_source_map_and_git_retained_in_full_fixture():
+    report = run_from_fixture_path(EXAMPLE, target_id="demo")
+    urls = {c.primary_url for c in report.candidates}
+    assert any(u.endswith(".js.map") for u in urls)
+    assert any(".git/HEAD" in u for u in urls)
+    assert report.metrics["candidates"] >= report.metrics["observations"] - 0
+
+
 def test_completed_zero():
     report = run_pipeline([])
     assert report.status == RunStatus.COMPLETED_ZERO.value
