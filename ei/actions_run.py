@@ -165,7 +165,7 @@ def run_actions_job(
                     store=store,
                     fixture_path=None,
                     github_fixture=None,
-                    github_live_query=scoped_query,
+                    github_live_query=github_query or "filename:.env OR extension:map",
                     allow_live_github=True,
                     max_results=effective_limit,
                     target_host=tv.host,

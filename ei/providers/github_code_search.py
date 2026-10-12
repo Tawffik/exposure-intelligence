@@ -91,7 +91,9 @@ def build_target_scoped_query_variants(target_host: str, base_terms: str = "", *
     terms: list[str] = []
     raw = (base_terms or "").strip()
     if raw:
-        # split on OR
+        # If caller passed an already-scoped "host term" string, strip leading host
+        if host and raw.lower().startswith(host.lower()):
+            raw = raw[len(host):].strip()
         parts = []
         buf = raw
         for sep in [" OR ", " or "]:
@@ -99,7 +101,7 @@ def build_target_scoped_query_variants(target_host: str, base_terms: str = "", *
                 parts = [x.strip().strip("()") for x in buf.split(sep)]
                 break
         if not parts:
-            parts = [raw.strip().strip("()")]
+            parts = [raw.strip().strip("()")] if raw.strip() else []
         terms = [p for p in parts if p]
     if not terms:
         terms = default_terms
