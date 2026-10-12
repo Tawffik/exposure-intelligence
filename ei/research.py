@@ -132,6 +132,7 @@ def run_research(
     allow_live_github: bool = False,
     max_results: int = 10,
     target_host: str = "",
+    research_mode: str = "",
 ) -> dict[str, Any]:
     """
     End-to-end operational run.
@@ -270,19 +271,28 @@ def run_research(
             if any(ps.status == RunStatus.COMPLETED_ZERO.value for ps in provider_summaries):
                 report.status = RunStatus.COMPLETED_ZERO.value
 
-    # Cross-run comparison
-    prev_id = store.previous_run_id(profile.target_id, run_id)
+    # Cross-run comparison — only against a compatible research_mode
+    mode_key = (research_mode or "").strip().lower()
+    prev_id = store.previous_run_id(
+        profile.target_id, run_id, research_mode=mode_key or None
+    )
     prev_keys: set[str] = set()
     prev_urls: set[str] = set()
+    history_note = ""
+    if mode_key and prev_id is None:
+        history_note = (
+            f"No prior run with research_mode={mode_key!r}; cross-mode history "
+            "is not compared (demo fixtures must not appear as missing after a "
+            "passive live run)."
+        )
     if prev_id:
         prev_keys = store.observation_keys_for_run(prev_id)
-        # also candidate keys
         prev_keys |= {k for k in store.candidate_keys_for_run(prev_id) if not k.startswith("url:")}
         prev_urls = {k for k in store.candidate_keys_for_run(prev_id) if k.startswith("url:")}
 
     queue = compare_runs(report, prev_keys, prev_urls)
 
-    # not observed in this run but present previously
+    # not observed in this run but present previously (compatible mode only)
     not_observed: list[dict[str, Any]] = []
     if prev_id:
         prev_report = store.load_run_report(prev_id)
@@ -296,15 +306,19 @@ def run_research(
                             "url": url,
                             "change_type": "NOT_IN_LATEST_RUN",
                             "note": (
-                                "Absent from latest run; not proof fixed — provider may have "
-                                "failed, been partial, or omitted the record."
+                                "Absent from latest compatible run; not proof fixed — "
+                                "provider may have failed, been partial, or omitted the record."
                             ),
                             "previous_classification": pc.get("classification"),
                         }
                     )
 
     # Persist after comparison annotations
-    store.save_run(report, profile_version=profile.profile_version)
+    store.save_run(
+        report,
+        profile_version=profile.profile_version,
+        research_mode=mode_key,
+    )
 
     new_count = sum(1 for q in queue if q["change_type"] == "NEW")
     repeated = sum(1 for q in queue if q["change_type"] == "REPEATED")
@@ -318,6 +332,10 @@ def run_research(
         "metrics": report.metrics,
         "provider_summaries": [p.to_dict() for p in provider_summaries],
         "previous_run_id": prev_id,
+        "research_mode": mode_key,
+        "history_compatibility": (
+            "same_mode" if prev_id else ("no_compatible_prior" if mode_key else "unspecified_mode")
+        ),
         "research_queue": queue,
         "not_in_latest_run": not_observed,
         "summary": {
@@ -328,5 +346,8 @@ def run_research(
             "potentially_sensitive": report.metrics.get("potentially_sensitive", 0),
         },
         "live_host_requests": 0,
-        "note": "No application-host verification performed; passive/offline only.",
+        "note": (
+            "No application-host verification performed; passive/offline only. "
+            + history_note
+        ).strip(),
     }

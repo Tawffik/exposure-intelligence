@@ -150,6 +150,7 @@ def run_actions_job(
                 allow_live_github=False,
                 max_results=effective_limit,
                 target_host=tv.host,
+                research_mode="demo",
             )
             result["note"] = (
                 (result.get("note") or "")
@@ -169,6 +170,7 @@ def run_actions_job(
                     allow_live_github=True,
                     max_results=effective_limit,
                     target_host=tv.host,
+                    research_mode="passive",
                 )
                 result["note"] = (
                     (result.get("note") or "")
@@ -186,6 +188,7 @@ def run_actions_job(
                     allow_live_github=False,
                     max_results=effective_limit,
                     target_host=tv.host,
+                    research_mode="passive",
                 )
                 if not result.get("provider_summaries"):
                     result["provider_summaries"] = [

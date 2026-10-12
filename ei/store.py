@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS runs (
     ended_at TEXT,
     status TEXT,
     profile_version TEXT,
+    research_mode TEXT,
     metrics_json TEXT,
     provider_summaries_json TEXT,
     report_json TEXT
@@ -73,18 +74,28 @@ class ResearchStore:
         self._conn = sqlite3.connect(str(self.path))
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(SCHEMA)
+        try:
+            self._conn.execute("ALTER TABLE runs ADD COLUMN research_mode TEXT")
+        except sqlite3.OperationalError:
+            pass
         self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()
 
-    def save_run(self, report: RunReport, *, profile_version: str = "") -> None:
+    def save_run(
+        self,
+        report: RunReport,
+        *,
+        profile_version: str = "",
+        research_mode: str = "",
+    ) -> None:
         self._conn.execute(
             """
             INSERT OR REPLACE INTO runs(
                 run_id, target_id, started_at, ended_at, status,
-                profile_version, metrics_json, provider_summaries_json, report_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                profile_version, research_mode, metrics_json, provider_summaries_json, report_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 report.run_id,
@@ -93,6 +104,7 @@ class ResearchStore:
                 report.ended_at,
                 report.status,
                 profile_version,
+                research_mode or "",
                 json.dumps(report.metrics),
                 json.dumps([p.to_dict() for p in report.provider_summaries]),
                 report.to_json(),
@@ -177,7 +189,29 @@ class ResearchStore:
             )
         return out
 
-    def previous_run_id(self, target_id: str, current_run_id: str) -> Optional[str]:
+    def previous_run_id(
+        self,
+        target_id: str,
+        current_run_id: str,
+        *,
+        research_mode: str | None = None,
+    ) -> Optional[str]:
+        """Prefer a prior run with the same research_mode when provided.
+
+        Cross-mode comparison is intentionally not performed: demo fixture
+        candidates must not appear as NOT_IN_LATEST_RUN after a passive live
+        index run (or the reverse).
+        """
+        if research_mode:
+            rows = self._conn.execute(
+                """
+                SELECT run_id FROM runs
+                WHERE target_id = ? AND run_id != ? AND IFNULL(research_mode, '') = ?
+                ORDER BY started_at DESC LIMIT 1
+                """,
+                (target_id, current_run_id, research_mode),
+            ).fetchall()
+            return rows[0]["run_id"] if rows else None
         rows = self._conn.execute(
             """
             SELECT run_id FROM runs
