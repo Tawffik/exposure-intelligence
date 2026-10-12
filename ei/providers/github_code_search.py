@@ -47,6 +47,93 @@ class ProviderCollectResult:
     provider: str = PROVIDER_NAME
 
 
+
+def build_target_scoped_query(target_host: str, base_terms: str = "") -> str:
+    """
+    Build a GitHub code-search query that prefers target-related hits.
+
+    Global filename-only queries are not target research. We require the
+    target hostname (or its registrable-ish label) to appear in the query so
+    results have a defensible retrieval context. Callers still must label
+    each result's relationship; query presence alone is not VERIFIED_DISCLOSURE.
+    """
+    host = (target_host or "").strip().lower().rstrip(".")
+    if not host:
+        raise ValueError("target_host required for scoped query")
+    # Prefer exact host string; also search bare apex label when multi-label
+    terms = [f'"{host}"']
+    labels = host.split(".")
+    if len(labels) >= 2 and labels[0] not in {"www", "api", "app", "dev", "staging"}:
+        # add quoted apex only when distinct and not too generic
+        apex = ".".join(labels[-2:]) if len(labels) > 2 else host
+        if apex != host:
+            terms.append(f'"{apex}"')
+    base = (base_terms or "").strip()
+    # Default disclosure-shaped terms — always AND with target context
+    if not base:
+        base = "(filename:.env OR filename:.env.example OR extension:map OR filename:backup OR filename:credentials)"
+    # Combine: target terms AND disclosure shape
+    target_clause = " OR ".join(terms)
+    return f"({target_clause}) {base}"
+
+
+def classify_index_relationship(
+    *,
+    target_host: str,
+    item_path: str = "",
+    repo_full_name: str = "",
+    body_snippet: str = "",
+    html_url: str = "",
+) -> dict:
+    """
+    Classify how a public-index hit relates to the selected target.
+
+    Never returns VERIFIED_DISCLOSURE — index evidence alone is insufficient.
+    """
+    host = (target_host or "").strip().lower().rstrip(".")
+    blob = " ".join(
+        [
+            item_path or "",
+            repo_full_name or "",
+            body_snippet or "",
+            html_url or "",
+        ]
+    ).lower()
+    if not host:
+        return {
+            "relationship": "UNATTRIBUTED",
+            "rationale": "No target host provided.",
+        }
+    if host in blob:
+        return {
+            "relationship": "DIRECT_TARGET_REFERENCE",
+            "rationale": f"Index artifact text/path/repo explicitly contains '{host}'.",
+        }
+    # apex / label heuristics
+    labels = host.split(".")
+    apex = ".".join(labels[-2:]) if len(labels) >= 2 else host
+    if apex and apex != host and apex in blob:
+        return {
+            "relationship": "RELATED_CANDIDATE",
+            "rationale": f"Index artifact references apex '{apex}' but not exact host '{host}'.",
+        }
+    # org-ish token (first label) — weak
+    if labels and len(labels[0]) >= 4 and labels[0] in blob:
+        return {
+            "relationship": "RELATED_CANDIDATE",
+            "rationale": (
+                f"Weak token match on '{labels[0]}'; not proof of relationship to '{host}'."
+            ),
+        }
+    return {
+        "relationship": "INDEX_ONLY",
+        "rationale": (
+            "Public index hit without a clear textual reference to the selected target. "
+            "Do not treat as a target finding."
+        ),
+    }
+
+
 def _text_match_fragment(item: dict[str, Any]) -> str:
     """Join text-match fragments when present; never invent body content."""
     matches = item.get("text_matches") or []
@@ -58,7 +145,12 @@ def _text_match_fragment(item: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-def normalize_github_item(item: dict[str, Any], *, query: str = "") -> dict[str, Any]:
+def normalize_github_item(
+    item: dict[str, Any],
+    *,
+    query: str = "",
+    target_host: str = "",
+) -> dict[str, Any]:
     """
     Convert one GitHub code-search item into an EI fixture-style observation record.
 
@@ -71,6 +163,13 @@ def normalize_github_item(item: dict[str, Any], *, query: str = "") -> dict[str,
     html_url = item.get("html_url") or ""
     sha = item.get("sha") or ""
     body = _text_match_fragment(item)
+    rel = classify_index_relationship(
+        target_host=target_host,
+        item_path=path,
+        repo_full_name=full_name,
+        body_snippet=body,
+        html_url=html_url,
+    )
 
     # Public GitHub blob is the observed artifact URL for this provider.
     discovered = html_url or (
@@ -105,6 +204,9 @@ def normalize_github_item(item: dict[str, Any], *, query: str = "") -> dict[str,
             "github_repository_url": repo.get("html_url") or "",
             "query": query,
             "provider": PROVIDER_NAME,
+            "target_relationship": rel["relationship"],
+            "target_relationship_rationale": rel["rationale"],
+            "selected_target_host": target_host,
         },
     }
 
@@ -113,6 +215,7 @@ def normalize_github_search_response(
     payload: dict[str, Any],
     *,
     query: str = "",
+    target_host: str = "",
 ) -> ProviderCollectResult:
     """Normalize a full search/code JSON body into observation records + status."""
     if not isinstance(payload, dict):
@@ -147,7 +250,7 @@ def normalize_github_search_response(
 
     incomplete = bool(payload.get("incomplete_results"))
     total = payload.get("total_count")
-    records = [normalize_github_item(it, query=query) for it in items if isinstance(it, dict)]
+    records = [normalize_github_item(it, query=query, target_host=target_host) for it in items if isinstance(it, dict)]
 
     if incomplete:
         status = RunStatus.PARTIAL.value
@@ -172,7 +275,7 @@ def normalize_github_search_response(
     )
 
 
-def load_github_fixture(path: Path, *, query: str = "") -> ProviderCollectResult:
+def load_github_fixture(path: Path, *, query: str = "", target_host: str = "") -> ProviderCollectResult:
     """Load a recorded GitHub search/code response from disk."""
     data = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(data, dict) and "response" in data:
@@ -184,7 +287,7 @@ def load_github_fixture(path: Path, *, query: str = "") -> ProviderCollectResult
             error_summary="Fixture must be a GitHub search JSON object.",
             query=query,
         )
-    return normalize_github_search_response(data, query=query)
+    return normalize_github_search_response(data, query=query, target_host=target_host)
 
 
 class GitHubCodeSearchProvider:
@@ -221,8 +324,8 @@ class GitHubCodeSearchProvider:
             coverage_notes="Config OK (token present)." if self.token else "Config OK (offline-only; no token).",
         )
 
-    def collect_from_fixture(self, path: Path, *, query: str = "") -> ProviderCollectResult:
-        return load_github_fixture(path, query=query)
+    def collect_from_fixture(self, path: Path, *, query: str = "", target_host: str = "") -> ProviderCollectResult:
+        return load_github_fixture(path, query=query, target_host=target_host)
 
     def collect_live(self, query: str, *, per_page: int = 10) -> ProviderCollectResult:
         """
@@ -243,7 +346,8 @@ class GitHubCodeSearchProvider:
                 query=query,
             )
 
-        params = urllib.parse.urlencode({"q": query, "per_page": max(1, min(per_page, 30))})
+        per_page = max(1, min(int(per_page), 30))
+        params = urllib.parse.urlencode({"q": query, "per_page": per_page})
         url = f"{self.api_url}?{params}"
         req = urllib.request.Request(
             url,
