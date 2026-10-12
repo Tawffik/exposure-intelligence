@@ -1,0 +1,8 @@
+{
+  "query": "filename:this-should-not-match-ei-fixture-xyz",
+  "response": {
+    "total_count": 0,
+    "incomplete_results": false,
+    "items": []
+  }
+}

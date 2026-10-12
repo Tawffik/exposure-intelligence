@@ -1,0 +1,59 @@
+{
+  "query": "filename:.env API_KEY extension:env",
+  "description": "Recorded GitHub code-search style payload for offline shadow-mode tests. Synthetic public-repo paths only.",
+  "response": {
+    "total_count": 3,
+    "incomplete_results": false,
+    "items": [
+      {
+        "name": ".env",
+        "path": ".env",
+        "sha": "aaa111bbb222ccc333ddd444eee555fff6667778",
+        "url": "https://api.github.com/repositories/1/contents/.env",
+        "html_url": "https://github.com/example-org/demo-app/blob/aaa111bbb222ccc333ddd444eee555fff6667778/.env",
+        "repository": {
+          "full_name": "example-org/demo-app",
+          "html_url": "https://github.com/example-org/demo-app"
+        },
+        "score": 1.0,
+        "text_matches": [
+          {
+            "fragment": "API_KEY=supersecretvalue12345\nDEBUG=true\n"
+          }
+        ]
+      },
+      {
+        "name": "app.js.map",
+        "path": "static/app.js.map",
+        "sha": "bbb222ccc333ddd444eee555fff6667778889990",
+        "html_url": "https://github.com/example-org/demo-app/blob/bbb222ccc333ddd444eee555fff6667778889990/static/app.js.map",
+        "repository": {
+          "full_name": "example-org/demo-app",
+          "html_url": "https://github.com/example-org/demo-app"
+        },
+        "score": 0.9,
+        "text_matches": [
+          {
+            "fragment": "{\"version\":3,\"file\":\"app.js\",\"sources\":[\"webpack:///src/app.js\"],\"mappings\":\"AAAA\",\"sourcesContent\":[\"const x=1\"]}"
+          }
+        ]
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "ccc333ddd444eee555fff666777888999000aaa1",
+        "html_url": "https://github.com/example-org/demo-app/blob/ccc333ddd444eee555fff666777888999000aaa1/README.md",
+        "repository": {
+          "full_name": "example-org/demo-app",
+          "html_url": "https://github.com/example-org/demo-app"
+        },
+        "score": 0.2,
+        "text_matches": [
+          {
+            "fragment": "# Demo App\nPublic documentation only."
+          }
+        ]
+      }
+    ]
+  }
+}

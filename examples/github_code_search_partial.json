@@ -1,0 +1,25 @@
+{
+  "query": "filename:.env",
+  "response": {
+    "total_count": 50,
+    "incomplete_results": true,
+    "items": [
+      {
+        "name": ".env.example",
+        "path": "config/.env.example",
+        "sha": "ddd444eee555fff666777888999000aaa111bbb2",
+        "html_url": "https://github.com/example-org/other/blob/ddd444eee555fff666777888999000aaa111bbb2/config/.env.example",
+        "repository": {
+          "full_name": "example-org/other",
+          "html_url": "https://github.com/example-org/other"
+        },
+        "score": 0.5,
+        "text_matches": [
+          {
+            "fragment": "API_KEY=\n# example only\n"
+          }
+        ]
+      }
+    ]
+  }
+}

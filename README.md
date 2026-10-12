@@ -76,6 +76,26 @@ python -m ei.cli demo -o /tmp/ei-report.json
 python -m ei.cli run examples/sample_observations.json -o /tmp/out.json
 ```
 
+
+## Shadow mode — GitHub Code Search (v0.1.2)
+
+Passive public-index provider integrated behind the existing observation contract.
+
+```bash
+# Offline (deterministic; default)
+python -m ei.cli shadow
+
+# Explicit fixtures
+python -m ei.cli shadow \
+  --baseline examples/sample_observations.json \
+  --github-fixture examples/github_code_search_sample.json
+
+# Optional live search (requires GITHUB_TOKEN; does NOT probe discovered hosts)
+GITHUB_TOKEN=... python -m ei.cli shadow --live --query 'filename:.env API_KEY'
+```
+
+Provider failure/rate-limit/empty states are explicit and never erase baseline candidates.
+
 ## Input format
 
 Fixture JSON is either a list of observation records or `{"observations": [...]}`.
