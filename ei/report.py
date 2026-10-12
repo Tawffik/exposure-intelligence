@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ei.models import utc_now_iso
+from ei.export_adapter import build_export_bundle, write_export_bundle
 
 
 def write_report_bundle(
@@ -297,5 +298,16 @@ def write_report_bundle(
     p_full = out_dir / "research-result.json"
     p_full.write_text(json.dumps(result, indent=2), encoding="utf-8")
     paths["research-result.json"] = p_full
+
+    try:
+        bundle = build_export_bundle(
+            result,
+            target_host=target_host,
+            research_mode=research_mode,
+        )
+        write_export_bundle(bundle, out_dir / "export-v1.json")
+        paths["export-v1.json"] = out_dir / "export-v1.json"
+    except Exception as e:
+        paths["export_error"] = str(e)
 
     return paths

@@ -29,6 +29,7 @@ from ei.providers.github_code_search import (
 )
 from ei.providers.urlscan import URLScanProvider
 from ei.evidence_review import review_queue_item
+from ei.probe import collect_probes
 from ei.ranker import observations_to_candidates
 from ei.store import ResearchStore
 
@@ -143,6 +144,8 @@ def run_research(
     max_results: int = 10,
     target_host: str = "",
     research_mode: str = "",
+    enable_probes: bool = False,
+    probe_budget: int = 5,
 ) -> dict[str, Any]:
     """
     End-to-end operational run.
@@ -311,6 +314,21 @@ def run_research(
             cdx_result = CDXProvider().collect_live(host_for_q, limit=max_results)
     _merge_provider(cdx_result, "internet_archive_cdx")
 
+    # --- Bounded current-state probes (fail-closed; ACTIVE only) ---
+    if enable_probes:
+        candidate_urls = [r.get("url") or "" for r in all_records]
+        # Prefer same-host path variants from historical/index leads only if in scope
+        probe_result = collect_probes(
+            profile,
+            candidate_urls,
+            budget=max(0, min(int(probe_budget), 20)),
+            prefer_head=True,
+        )
+        _merge_provider(probe_result, "current_state_probe")
+        live_reqs = len(probe_result.actual_queries or []) if probe_result else 0
+    else:
+        live_reqs = 0
+
     # Pipeline
     report = run_pipeline(
         all_records,
@@ -409,7 +427,7 @@ def run_research(
             "not_in_latest_run": len(not_observed),
             "potentially_sensitive": report.metrics.get("potentially_sensitive", 0),
         },
-        "live_host_requests": 0,
+        "live_host_requests": live_reqs if enable_probes else 0,
         "note": (
             "No application-host verification performed; passive/offline only. "
             + history_note

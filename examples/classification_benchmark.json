@@ -53,5 +53,49 @@
     "body": "<div id=\"root\"></div><script>You need to enable JavaScript</script>",
     "discovery_mode": "CURRENT_OBSERVATION",
     "note": "Negative: SPA fallback"
+  },
+  {
+    "id": "neg_waf_block",
+    "expected_classification": "AUTH_REQUIRED",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://example-authorized.test/admin",
+    "status": 403,
+    "content_type": "text/html",
+    "body": "Attention Required! | Cloudflare<br/>Request blocked",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "HTTP 403 auth/blocked status path"
+  },
+  {
+    "id": "pos_git_head",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "POTENTIAL_EXPOSURE_UNCONFIRMED",
+    "url": "https://example-authorized.test/.git/HEAD",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "ref: refs/heads/main\n",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Git metadata"
+  },
+  {
+    "id": "neg_empty_body",
+    "expected_classification": "EMPTY_RESPONSE",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://example-authorized.test/empty",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Empty body"
+  },
+  {
+    "id": "hist_cdx_backup",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "POTENTIAL_EXPOSURE_UNCONFIRMED",
+    "url": "https://example-authorized.test/backup.zip",
+    "status": 200,
+    "content_type": "application/zip",
+    "body": "PK\u0003\u0004fakezip",
+    "discovery_mode": "HISTORICAL",
+    "note": "Archive content-type \u2014 sensitive type, impact unproven"
   }
 ]
