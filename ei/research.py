@@ -28,6 +28,7 @@ from ei.providers.github_code_search import (
     build_target_scoped_query_variants,
 )
 from ei.providers.urlscan import URLScanProvider
+from ei.evidence_review import review_queue_item
 from ei.ranker import observations_to_candidates
 from ei.store import ResearchStore
 
@@ -80,24 +81,27 @@ def compare_runs(
         else:
             change = "NEW"
         next_step = _suggest_next_step(c)
-        queue.append(
-            {
-                "candidate_id": c.candidate_id,
-                "url": c.primary_url,
-                "classification": c.classification,
-                "sensitivity": c.sensitivity,
-                "confidence": c.confidence,
-                "rank_score": c.rank_score,
-                "change_type": change,
-                "impact_hypothesis": c.impact_hypothesis,
-                "confidence_rationale": c.confidence_rationale,
-                "rank_explanation": c.rank_explanation,
-                "evidence_summary": c.evidence_summary,
-                "source_fidelity": c.source_fidelity,
-                "suggested_next_step": next_step,
-                "review_status": c.review_status,
-            }
-        )
+        item = {
+            "candidate_id": c.candidate_id,
+            "url": c.primary_url,
+            "classification": c.classification,
+            "sensitivity": c.sensitivity,
+            "confidence": c.confidence,
+            "rank_score": c.rank_score,
+            "change_type": change,
+            "impact_hypothesis": c.impact_hypothesis,
+            "confidence_rationale": c.confidence_rationale,
+            "rank_explanation": c.rank_explanation,
+            "evidence_summary": c.evidence_summary,
+            "source_fidelity": c.source_fidelity,
+            "suggested_next_step": next_step,
+            "review_status": c.review_status,
+            "classification_reason_codes": list(
+                getattr(c, "classification_reason_codes", None) or []
+            ),
+        }
+        # Prefer reason codes from primary observation via evidence_summary parse fallback
+        queue.append(review_queue_item(item))
     queue.sort(key=lambda x: (-(x["rank_score"] or 0), x["url"] or ""))
     return queue
 

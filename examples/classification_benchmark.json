@@ -1,0 +1,57 @@
+[
+  {
+    "id": "pos_env_with_aws_key",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "POTENTIAL_EXPOSURE_UNCONFIRMED",
+    "url": "https://example-authorized.test/.env",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nDEBUG=true\n",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Positive: path + secret-like pattern (fixture uses AWS example key shape)"
+  },
+  {
+    "id": "neg_env_example_placeholder",
+    "expected_classification": "IMPACT_UNPROVEN",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://github.com/other/repo/blob/main/.env.example",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "API_KEY=your_api_key_here\nDATABASE_URL=postgres://user:pass@localhost/db\n",
+    "discovery_mode": "PASSIVE_INDEX",
+    "note": "Negative: template path + placeholders"
+  },
+  {
+    "id": "neg_public_html",
+    "expected_classification": "INTENTIONALLY_PUBLIC",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://example-authorized.test/about",
+    "status": 200,
+    "content_type": "text/html",
+    "body": "<html><body><h1>About us</h1><p>Welcome</p></body></html>",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Negative: ordinary public page"
+  },
+  {
+    "id": "pos_directory_listing",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "NEEDS_REVIEW",
+    "url": "https://example-authorized.test/uploads/",
+    "status": 200,
+    "content_type": "text/html",
+    "body": "<title>Index of /uploads/</title><h1>Index of /uploads/</h1><pre><a href=\"backup.zip\">backup.zip</a></pre>",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Positive shape: directory listing with sensitive name hint"
+  },
+  {
+    "id": "neg_spa_shell",
+    "expected_classification": "SPA_SHELL",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://example-authorized.test/app/missing-route",
+    "status": 200,
+    "content_type": "text/html",
+    "body": "<div id=\"root\"></div><script>You need to enable JavaScript</script>",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Negative: SPA fallback"
+  }
+]
