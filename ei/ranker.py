@@ -86,6 +86,7 @@ def observations_to_candidates(observations: Iterable[Observation]) -> list[Cand
             duplicate_of=dup_of,
             source_fidelity=primary.source_fidelity,
             evidence_summary=_evidence_summary(primary, group),
+            classification_reason_codes=list(primary.classification_reason_codes or []),
         )
         if is_dup:
             cand.rank_score = 0.0
@@ -135,6 +136,43 @@ def score_candidate(primary: Observation, group: list[Observation]) -> tuple[flo
         explanation.append("out_of_scope_penalty")
     elif rel == "DIRECT_TARGET_REFERENCE" or scope == "IN_SCOPE":
         explanation.append("target_relationship=DIRECT_OR_IN_SCOPE")
+
+    # Demote example/template paths and path-only elevation without content reasons
+    url_l = (primary.discovered_url or "").lower()
+    reasons = set(primary.classification_reason_codes or [])
+    if any(
+        x in url_l
+        for x in (
+            ".env.example",
+            ".env.sample",
+            ".env.template",
+            ".env.dist",
+            "example.env",
+            "/examples/",
+            "/example/",
+        )
+    ):
+        score *= 0.35
+        explanation.append("example_template_path_penalty")
+    content_supported = any(
+        r.startswith("secret_pattern:")
+        or r
+        in {
+            "diagnostic_trace_page",
+            "directory_listing_fingerprint",
+            "source_map_with_sources_content",
+            "git_metadata_exposure",
+            "archive_or_binary_content_type",
+        }
+        for r in reasons
+    )
+    path_driven = "sensitive_path_with_content" in reasons or "sensitive_path_hint" in reasons
+    if path_driven and not content_supported:
+        score *= 0.6
+        explanation.append("path_only_without_content_secret_penalty")
+        explanation.append(
+            "rank_note=filename/path hints are not content-confirmed secrets"
+        )
 
     return round(min(1.0, score), 4), explanation
 

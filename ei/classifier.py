@@ -358,8 +358,15 @@ def classify_observation(
             freshness,
         )
 
-    if SENSITIVE_PATH_HINTS.search(url_l) and status == 200 and body.strip():
+    if SENSITIVE_PATH_HINTS.search(url_l) and status in (None, 200) and body.strip():
         # Keyword path match alone is weak without content support
+        is_example_path = bool(
+            re.search(
+                r"(?i)(\.env\.example|\.env\.sample|\.env\.template|\.env\.dist|"
+                r"example\.env|/examples?/)",
+                url_l,
+            )
+        )
         if len(body) < 40 and "text/html" in ct:
             return (
                 Classification.KEYWORD_FALSE_POSITIVE.value,
@@ -370,12 +377,24 @@ def classify_observation(
                 freshness,
             )
         reasons.append("sensitive_path_with_content")
+        if is_example_path:
+            reasons.append("example_or_template_path")
         # Check for secret patterns (presence only; values redacted elsewhere)
         from ei.models import SECRET_PATTERNS
 
         for pat, name in SECRET_PATTERNS:
             if pat.search(body):
                 reasons.append(f"secret_pattern:{name}")
+                if is_example_path:
+                    return (
+                        Classification.IMPACT_UNPROVEN.value,
+                        reasons,
+                        0.45,
+                        "Example/template path with secret-like pattern in snippet; "
+                        "likely documentation/sample — impact unproven.",
+                        SensitivityClass.LOW.value,
+                        freshness,
+                    )
                 return (
                     Classification.POTENTIALLY_SENSITIVE.value,
                     reasons,
@@ -384,6 +403,15 @@ def classify_observation(
                     SensitivityClass.HIGH.value,
                     freshness,
                 )
+        if is_example_path:
+            return (
+                Classification.IMPACT_UNPROVEN.value,
+                reasons,
+                0.35,
+                "Example/template path; filename alone is not a confirmed exposure.",
+                SensitivityClass.LOW.value,
+                freshness,
+            )
         return (
             Classification.IMPACT_UNPROVEN.value,
             reasons,

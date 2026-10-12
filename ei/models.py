@@ -174,6 +174,7 @@ class Candidate:
     review_status: str = "PENDING"
     source_fidelity: str = SourceFidelity.ORIGINAL.value
     evidence_summary: str = ""
+    classification_reason_codes: list[str] = field(default_factory=list)
     created_at: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> dict[str, Any]:
