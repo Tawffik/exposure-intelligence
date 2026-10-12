@@ -103,7 +103,21 @@ def compare_runs(
         }
         # Prefer reason codes from primary observation via evidence_summary parse fallback
         queue.append(review_queue_item(item))
-    queue.sort(key=lambda x: (-(x["rank_score"] or 0), x["url"] or ""))
+    # Prefer actionable reviews; push historical/empty shells to the bottom
+    _rev_w = {
+        "POTENTIAL_EXPOSURE_UNCONFIRMED": 3,
+        "NEEDS_REVIEW": 2,
+        "LOW_PRIORITY": 0,
+    }
+    _noise_cls = {"EMPTY_RESPONSE", "HISTORICAL_ONLY", "SPA_SHELL", "GENERIC_ERROR"}
+    queue.sort(
+        key=lambda x: (
+            1 if (x.get("classification") or "") in _noise_cls else 0,
+            -_rev_w.get(x.get("review_decision") or "", 1),
+            -(x["rank_score"] or 0),
+            x["url"] or "",
+        )
+    )
     return queue
 
 

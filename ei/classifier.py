@@ -214,6 +214,15 @@ def classify_observation(
         )
 
     if not body.strip() and (status is None or status == 200):
+        if (discovery_mode or "").upper() == "HISTORICAL":
+            return (
+                Classification.HISTORICAL_ONLY.value,
+                ["empty_body", "historical_index_without_content"],
+                0.55,
+                "Historical index row without body content; not current exposure.",
+                SensitivityClass.NONE.value,
+                Freshness.HISTORICAL.value,
+            )
         return (
             Classification.EMPTY_RESPONSE.value,
             ["empty_body"],
