@@ -21,11 +21,13 @@ from ei.models import (
 )
 from ei.pipeline import load_fixture_file, run_pipeline
 from ei.profile import ProgramProfile, assess_relevance, live_request_permitted, validate_profile
+from ei.providers.base import ProviderCollectResult
+from ei.providers.cdx import CDXProvider
 from ei.providers.github_code_search import (
     GitHubCodeSearchProvider,
-    ProviderCollectResult,
     build_target_scoped_query_variants,
 )
+from ei.providers.urlscan import URLScanProvider
 from ei.ranker import observations_to_candidates
 from ei.store import ResearchStore
 
@@ -130,6 +132,10 @@ def run_research(
     github_fixture: Optional[Path] = None,
     github_live_query: Optional[str] = None,
     allow_live_github: bool = False,
+    urlscan_fixture: Optional[Path] = None,
+    allow_live_urlscan: bool = False,
+    cdx_fixture: Optional[Path] = None,
+    allow_live_cdx: bool = False,
     max_results: int = 10,
     target_host: str = "",
     research_mode: str = "",
@@ -137,8 +143,9 @@ def run_research(
     """
     End-to-end operational run.
 
-    Collects from local fixture and/or GitHub (fixture or optional live),
-    classifies, persists, compares to previous run for the same target_id.
+    Collects from local fixture and/or passive providers (GitHub, URLScan, CDX)
+    via fixture or optional live public APIs. Classifies, persists, compares
+    to previous run for the same target_id and research_mode.
     Never probes application hosts discovered in search results.
     """
     v = validate_profile(profile)
@@ -217,35 +224,88 @@ def run_research(
             error_summary="Live GitHub requested but no query provided.",
         )
 
-    if gh_result is not None:
-        if gh_result.status in (
+    def _merge_provider(result: Optional[ProviderCollectResult], name: str) -> None:
+        if result is None:
+            return
+        if result.status in (
             RunStatus.COMPLETED_WITH_RESULTS.value,
             RunStatus.PARTIAL.value,
         ):
-            # Enforce effective max_results on provider output
-            limited = list(gh_result.records)[: max(1, min(int(max_results), 30))]
-            if len(gh_result.records) > len(limited):
-                gh_result.coverage_notes = (
-                    (gh_result.coverage_notes or "")
-                    + f" Truncated to max_results={len(limited)} (had {len(gh_result.records)})."
+            limited = list(result.records)[: max(1, min(int(max_results), 30))]
+            if len(result.records) > len(limited):
+                result.coverage_notes = (
+                    (result.coverage_notes or "")
+                    + f" Truncated to max_results={len(limited)} (had {len(result.records)})."
                 )
             annotated = _annotate_relevance(limited, profile)
             all_records.extend(annotated)
         provider_summaries.append(
             ProviderRunSummary(
-                provider="github_code_search",
-                status=gh_result.status,
+                provider=name,
+                status=result.status,
                 started_at=started,
                 ended_at=utc_now_iso(),
-                records_received=len(gh_result.records),
-                records_normalized=len(gh_result.records)
-                if gh_result.status
-                in (RunStatus.COMPLETED_WITH_RESULTS.value, RunStatus.PARTIAL.value)
+                records_received=len(result.records),
+                records_normalized=min(len(result.records), max(1, min(int(max_results), 30)))
+                if result.status
+                in (
+                    RunStatus.COMPLETED_WITH_RESULTS.value,
+                    RunStatus.PARTIAL.value,
+                )
                 else 0,
-                error_summary=gh_result.error_summary,
-                coverage_notes=gh_result.coverage_notes,
+                error_summary=result.error_summary or "",
+                coverage_notes=result.coverage_notes or "",
             )
         )
+
+    _merge_provider(gh_result, "github_code_search")
+
+    # --- URLScan passive provider ---
+    us_result: Optional[ProviderCollectResult] = None
+    host_for_q = target_host or (profile.in_scope_hosts[0] if profile.in_scope_hosts else "")
+    if urlscan_fixture is not None:
+        us_result = URLScanProvider().collect_from_fixture(
+            urlscan_fixture, target_host=host_for_q, limit=max_results
+        )
+    elif allow_live_urlscan:
+        if "PASSIVE_INDEX" not in profile.allowed_operations:
+            us_result = ProviderCollectResult(
+                status=RunStatus.SKIPPED_BY_POLICY.value,
+                error_summary="PASSIVE_INDEX not in profile.allowed_operations.",
+                provider="urlscan",
+            )
+        elif not host_for_q:
+            us_result = ProviderCollectResult(
+                status=RunStatus.ERROR.value,
+                error_summary="URLScan live requires target_host.",
+                provider="urlscan",
+            )
+        else:
+            us_result = URLScanProvider().collect_live(host_for_q, size=max_results)
+    _merge_provider(us_result, "urlscan")
+
+    # --- Internet Archive CDX historical provider ---
+    cdx_result: Optional[ProviderCollectResult] = None
+    if cdx_fixture is not None:
+        cdx_result = CDXProvider().collect_from_fixture(
+            cdx_fixture, target_host=host_for_q, limit=max_results
+        )
+    elif allow_live_cdx:
+        if "HISTORICAL" not in profile.allowed_operations and "PASSIVE_INDEX" not in profile.allowed_operations:
+            cdx_result = ProviderCollectResult(
+                status=RunStatus.SKIPPED_BY_POLICY.value,
+                error_summary="HISTORICAL/PASSIVE_INDEX not in profile.allowed_operations.",
+                provider="internet_archive_cdx",
+            )
+        elif not host_for_q:
+            cdx_result = ProviderCollectResult(
+                status=RunStatus.ERROR.value,
+                error_summary="CDX live requires target_host.",
+                provider="internet_archive_cdx",
+            )
+        else:
+            cdx_result = CDXProvider().collect_live(host_for_q, limit=max_results)
+    _merge_provider(cdx_result, "internet_archive_cdx")
 
     # Pipeline
     report = run_pipeline(

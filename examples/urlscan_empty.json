@@ -1,0 +1,7 @@
+{
+  "_ei_query": "domain:example-authorized.test",
+  "total": 0,
+  "took": 5,
+  "has_more": false,
+  "results": []
+}

@@ -127,7 +127,7 @@ def test_actions_run_passive_without_token_is_not_configured():
                 db_path=td / "research.db",
                 research_mode="passive",
             )
-            assert result.get("data_source_label") == "github_not_configured"
+            assert "github_not_configured" in (result.get("data_source_label") or "")
             assert (td / "artifacts" / "coverage-and-errors.md").exists()
         finally:
             if env_tok is not None:
