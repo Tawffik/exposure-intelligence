@@ -194,7 +194,7 @@ class ResearchStore:
         target_id: str,
         current_run_id: str,
         *,
-        research_mode: str | None = None,
+        research_mode: Optional[str] = None,
     ) -> Optional[str]:
         """Prefer a prior run with the same research_mode when provided.
 
