@@ -17,7 +17,9 @@ import tempfile
 def test_scoped_query_includes_target_host():
     q = build_target_scoped_query("acme-example.com")
     assert "acme-example.com" in q
-    assert "filename:.env" in q or "extension:map" in q
+    assert "filename:.env" in q
+    # Must not use parenthesized OR groups that GitHub rejects with 422
+    assert " OR " not in q
 
 
 def test_scoped_query_rejects_empty_host():

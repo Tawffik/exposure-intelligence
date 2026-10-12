@@ -21,7 +21,11 @@ from ei.models import (
 )
 from ei.pipeline import load_fixture_file, run_pipeline
 from ei.profile import ProgramProfile, assess_relevance, live_request_permitted, validate_profile
-from ei.providers.github_code_search import GitHubCodeSearchProvider, ProviderCollectResult
+from ei.providers.github_code_search import (
+    GitHubCodeSearchProvider,
+    ProviderCollectResult,
+    build_target_scoped_query_variants,
+)
 from ei.ranker import observations_to_candidates
 from ei.store import ResearchStore
 
@@ -192,7 +196,20 @@ def run_research(
                 query=github_live_query or "",
             )
         else:
-            gh_result = gh.collect_live(github_live_query, per_page=max(1, min(int(max_results), 30)))
+            host_for_q = target_host or (profile.in_scope_hosts[0] if profile.in_scope_hosts else "")
+            if host_for_q:
+                variants = build_target_scoped_query_variants(host_for_q, github_live_query or "", limit=4)
+                gh_result = gh.collect_live_multi(
+                    variants,
+                    per_page=max(1, min(int(max_results), 30)),
+                    max_total=max(1, min(int(max_results), 30)),
+                    target_host=host_for_q,
+                )
+            else:
+                gh_result = gh.collect_live(
+                    github_live_query or "",
+                    per_page=max(1, min(int(max_results), 30)),
+                )
     elif allow_live_github and not github_live_query:
         gh_result = ProviderCollectResult(
             status=RunStatus.ERROR.value,

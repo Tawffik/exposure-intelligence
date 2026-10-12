@@ -50,31 +50,63 @@ class ProviderCollectResult:
 
 def build_target_scoped_query(target_host: str, base_terms: str = "") -> str:
     """
-    Build a GitHub code-search query that prefers target-related hits.
+    Build a GitHub code-search query that includes the target host.
 
-    Global filename-only queries are not target research. We require the
-    target hostname (or its registrable-ish label) to appear in the query so
-    results have a defensible retrieval context. Callers still must label
-    each result's relationship; query presence alone is not VERIFIED_DISCLOSURE.
+    GitHub code search rejects some parenthesized OR groups (HTTP 422).
+    Prefer a simple AND form: <host> <shape-term>
+
+    For multi-shape research, callers may invoke collect_live multiple times
+    via build_target_scoped_query_variants().
     """
     host = (target_host or "").strip().lower().rstrip(".")
     if not host:
         raise ValueError("target_host required for scoped query")
-    # Prefer exact host string; also search bare apex label when multi-label
-    terms = [f'"{host}"']
-    labels = host.split(".")
-    if len(labels) >= 2 and labels[0] not in {"www", "api", "app", "dev", "staging"}:
-        # add quoted apex only when distinct and not too generic
-        apex = ".".join(labels[-2:]) if len(labels) > 2 else host
-        if apex != host:
-            terms.append(f'"{apex}"')
+    for ch in "(){}[]\"\"'":
+        host = host.replace(ch, "")
+    if not host or "." not in host:
+        raise ValueError("target_host must be a multi-label domain after sanitization")
+
     base = (base_terms or "").strip()
-    # Default disclosure-shaped terms — always AND with target context
+    # If operator supplied a complex OR expression, use the first filename/extension term only
+    # to keep a single valid query; variants() expands the rest.
     if not base:
-        base = "(filename:.env OR filename:.env.example OR extension:map OR filename:backup OR filename:credentials)"
-    # Combine: target terms AND disclosure shape
-    target_clause = " OR ".join(terms)
-    return f"({target_clause}) {base}"
+        base = "filename:.env"
+    elif " OR " in base.upper():
+        # take first clause only for the primary query
+        first = base.split(" OR ")[0].split(" or ")[0].strip().strip("()")
+        base = first or "filename:.env"
+    # Remove outer parens that break the parser when combined with host
+    base = base.strip()
+    if base.startswith("(") and base.endswith(")"):
+        base = base[1:-1].strip()
+    return f"{host} {base}"
+
+
+def build_target_scoped_query_variants(target_host: str, base_terms: str = "", *, limit: int = 4) -> list[str]:
+    """Return up to `limit` simple host+term queries (no OR groups)."""
+    host = (target_host or "").strip().lower().rstrip(".")
+    for ch in "(){}[]\"\"'":
+        host = host.replace(ch, "")
+    default_terms = ["filename:.env", "filename:.env.example", "extension:map", "filename:backup"]
+    terms: list[str] = []
+    raw = (base_terms or "").strip()
+    if raw:
+        # split on OR
+        parts = []
+        buf = raw
+        for sep in [" OR ", " or "]:
+            if sep in buf:
+                parts = [x.strip().strip("()") for x in buf.split(sep)]
+                break
+        if not parts:
+            parts = [raw.strip().strip("()")]
+        terms = [p for p in parts if p]
+    if not terms:
+        terms = default_terms
+    queries = []
+    for term in terms[: max(1, limit)]:
+        queries.append(f"{host} {term}")
+    return queries
 
 
 def classify_index_relationship(
@@ -327,7 +359,7 @@ class GitHubCodeSearchProvider:
     def collect_from_fixture(self, path: Path, *, query: str = "", target_host: str = "") -> ProviderCollectResult:
         return load_github_fixture(path, query=query, target_host=target_host)
 
-    def collect_live(self, query: str, *, per_page: int = 10) -> ProviderCollectResult:
+    def collect_live(self, query: str, *, per_page: int = 10, target_host: str = "") -> ProviderCollectResult:
         """
         Optional live search. Requires token. Does not request target apps.
 
@@ -399,4 +431,87 @@ class GitHubCodeSearchProvider:
                 query=query,
             )
 
-        return normalize_github_search_response(payload, query=query)
+        return normalize_github_search_response(payload, query=query, target_host=target_host)
+
+    def collect_live_multi(
+        self,
+        queries: list[str],
+        *,
+        per_page: int = 10,
+        max_total: int = 10,
+        target_host: str = "",
+    ) -> ProviderCollectResult:
+        """
+        Run several simple queries; merge unique records up to max_total.
+        Stops early on RATE_LIMITED / NOT_CONFIGURED. Never probes app hosts.
+        """
+        if not self.token:
+            return ProviderCollectResult(
+                status=RunStatus.NOT_CONFIGURED.value,
+                error_summary="GITHUB_TOKEN / GH_TOKEN not set; cannot run live search.",
+                query="; ".join(queries),
+            )
+        merged: list[dict] = []
+        seen: set[str] = set()
+        notes: list[str] = []
+        last_status = RunStatus.COMPLETED_ZERO.value
+        errors: list[str] = []
+        for q in queries:
+            if len(merged) >= max_total:
+                break
+            remaining = max_total - len(merged)
+            r = self.collect_live(q, per_page=min(per_page, remaining), target_host=target_host)
+            notes.append(f"{q!r}->{r.status}/{len(r.records)}")
+            if r.status == RunStatus.NOT_CONFIGURED.value:
+                return r
+            if r.status == RunStatus.RATE_LIMITED.value:
+                if merged:
+                    return ProviderCollectResult(
+                        status=RunStatus.PARTIAL.value,
+                        records=merged,
+                        error_summary=r.error_summary,
+                        coverage_notes="Rate limited after partial collection. " + "; ".join(notes),
+                        query="; ".join(queries),
+                        incomplete_results=True,
+                    )
+                return r
+            if r.status == RunStatus.ERROR.value:
+                errors.append(r.error_summary)
+                last_status = RunStatus.ERROR.value
+                continue
+            for rec in r.records:
+                key = rec.get("url") or rec.get("source_record_id") or ""
+                if key in seen:
+                    continue
+                seen.add(key)
+                merged.append(rec)
+                if len(merged) >= max_total:
+                    break
+            if r.status == RunStatus.COMPLETED_WITH_RESULTS.value:
+                last_status = RunStatus.COMPLETED_WITH_RESULTS.value
+            elif r.status == RunStatus.PARTIAL.value:
+                last_status = RunStatus.PARTIAL.value
+            elif last_status != RunStatus.COMPLETED_WITH_RESULTS.value and r.status == RunStatus.COMPLETED_ZERO.value:
+                last_status = RunStatus.COMPLETED_ZERO.value
+        if not merged and last_status == RunStatus.ERROR.value:
+            return ProviderCollectResult(
+                status=RunStatus.ERROR.value,
+                error_summary="; ".join(errors)[:500],
+                coverage_notes="; ".join(notes),
+                query="; ".join(queries),
+            )
+        if not merged:
+            return ProviderCollectResult(
+                status=RunStatus.COMPLETED_ZERO.value,
+                coverage_notes="; ".join(notes),
+                query="; ".join(queries),
+            )
+        status = last_status if last_status != RunStatus.COMPLETED_ZERO.value else RunStatus.COMPLETED_WITH_RESULTS.value
+        return ProviderCollectResult(
+            status=status,
+            records=merged[:max_total],
+            coverage_notes="; ".join(notes) + f"; merged={len(merged)}",
+            query="; ".join(queries),
+            incomplete_results=len(merged) >= max_total,
+        )
+
