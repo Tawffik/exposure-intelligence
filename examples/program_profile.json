@@ -1,0 +1,19 @@
+{
+  "target_id": "demo-program",
+  "program_name": "Demo Authorized Program",
+  "authorization_status": "ACTIVE",
+  "authorization_reference": "https://example.com/bug-bounty#demo",
+  "authorization_reviewed_at": "2026-10-12",
+  "in_scope_hosts": ["example-authorized.test"],
+  "in_scope_domains": ["example-authorized.test"],
+  "out_of_scope_hosts": [],
+  "out_of_scope_domains": ["out-of-scope.example"],
+  "allowed_operations": [
+    "PASSIVE_INDEX",
+    "HISTORICAL",
+    "CURRENT_OBSERVATION_GET",
+    "CURRENT_OBSERVATION_HEAD"
+  ],
+  "notes": "Synthetic profile for offline operational demo. Live GET/HEAD only against example-authorized.test when explicitly implemented.",
+  "profile_version": "1"
+}

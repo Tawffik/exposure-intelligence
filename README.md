@@ -12,7 +12,7 @@ This repository is the implementation of the [Exposure Intelligence project char
 - **Explainable classification and ranking** — scores come with reason codes; an exposed artifact is not automatically a vulnerability.
 - **Safety first** — offline fixtures by default; secrets are redacted; no live probing without separate authorization policy (not enabled in MVP).
 
-## Status (v0.1.1)
+## Status (v0.1.3)
 
 | Capability | Status |
 | --- | --- |
@@ -76,6 +76,32 @@ python -m ei.cli demo -o /tmp/ei-report.json
 python -m ei.cli run examples/sample_observations.json -o /tmp/out.json
 ```
 
+
+
+## Operational workflow (v0.1.3)
+
+```bash
+# 1. Validate program profile
+python -m ei.cli profile-validate examples/program_profile.json
+
+# 2. Research run (offline fixtures; persists to SQLite)
+python -m ei.cli research \
+  --profile examples/program_profile.json \
+  --fixture examples/sample_observations.json \
+  --github-fixture examples/github_code_search_sample.json \
+  --db ei_data/research.db
+
+# 3. History and research queue
+python -m ei.cli history --db ei_data/research.db --target-id demo-program
+python -m ei.cli queue --db ei_data/research.db --target-id demo-program
+
+# Optional live GitHub index only (no target host probing)
+GITHUB_TOKEN=... python -m ei.cli research --profile examples/program_profile.json \
+  --live-github --query 'filename:.env API_KEY' --db ei_data/research.db
+```
+
+Profile gates **live host requests** only. Passive index leads are retained with
+`PUBLIC_INDEX` / `UNATTRIBUTED` relevance labels — never silently dropped.
 
 ## Shadow mode — GitHub Code Search (v0.1.2)
 
