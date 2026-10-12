@@ -1,0 +1,45 @@
+{
+  "_ei_query": "domain:example-authorized.test",
+  "total": 2,
+  "took": 12,
+  "has_more": false,
+  "results": [
+    {
+      "_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "task": {
+        "uuid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "time": "2024-06-01T12:00:00.000Z",
+        "url": "https://example-authorized.test/.env",
+        "domain": "example-authorized.test"
+      },
+      "page": {
+        "url": "https://example-authorized.test/.env",
+        "domain": "example-authorized.test",
+        "status": 200,
+        "server": "nginx",
+        "title": "index of"
+      },
+      "stats": {"uniqIPs": 1, "dataLength": 120, "requests": 3},
+      "result": "https://urlscan.io/api/v1/result/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/",
+      "screenshot": ""
+    },
+    {
+      "_id": "ffffffff-1111-2222-3333-444444444444",
+      "task": {
+        "uuid": "ffffffff-1111-2222-3333-444444444444",
+        "time": "2024-05-15T08:30:00.000Z",
+        "url": "https://cdn.unrelated.example/assets/app.js",
+        "domain": "cdn.unrelated.example"
+      },
+      "page": {
+        "url": "https://cdn.unrelated.example/assets/app.js",
+        "domain": "cdn.unrelated.example",
+        "status": 200,
+        "server": "cloudflare",
+        "title": ""
+      },
+      "stats": {"uniqIPs": 2, "dataLength": 5000, "requests": 10},
+      "result": "https://urlscan.io/api/v1/result/ffffffff-1111-2222-3333-444444444444/"
+    }
+  ]
+}

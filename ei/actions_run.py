@@ -148,50 +148,71 @@ def run_actions_job(
                 fixture_path=root / "examples" / "sample_observations.json",
                 github_fixture=root / "examples" / "github_code_search_sample.json",
                 allow_live_github=False,
+                urlscan_fixture=root / "examples" / "urlscan_sample.json",
+                allow_live_urlscan=False,
+                cdx_fixture=root / "examples" / "cdx_sample.json",
+                allow_live_cdx=False,
                 max_results=effective_limit,
                 target_host=tv.host,
                 research_mode="demo",
             )
             result["note"] = (
                 (result.get("note") or "")
-                + " DEMO/FIXTURE mode — not live research. "
+                + " DEMO/FIXTURE mode — fixtures for baseline, GitHub, URLScan, CDX. "
+                + "Not live research. "
                 + f"Requested/effective max_results={requested_limit}."
             )
         else:
             token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+            # Public index APIs (URLScan/CDX) default on in GitHub Actions, or when
+            # EI_LIVE_PUBLIC_INDEXES=1. Local/unit runs stay offline unless opted in.
+            live_public = (
+                os.environ.get("GITHUB_ACTIONS") == "true"
+                or os.environ.get("EI_LIVE_PUBLIC_INDEXES", "").strip() == "1"
+            )
+            result = run_research(
+                profile,
+                store=store,
+                fixture_path=None,
+                github_fixture=None,
+                github_live_query=(
+                    (github_query or "filename:.env OR extension:map") if token else None
+                ),
+                allow_live_github=bool(token),
+                urlscan_fixture=None,
+                allow_live_urlscan=live_public,
+                cdx_fixture=None,
+                allow_live_cdx=live_public,
+                max_results=effective_limit,
+                target_host=tv.host,
+                research_mode="passive",
+            )
+            sources = []
             if token:
-                data_label = "live_github_code_search"
-                result = run_research(
-                    profile,
-                    store=store,
-                    fixture_path=None,
-                    github_fixture=None,
-                    github_live_query=github_query or "filename:.env OR extension:map",
-                    allow_live_github=True,
-                    max_results=effective_limit,
-                    target_host=tv.host,
-                    research_mode="passive",
-                )
-                result["note"] = (
-                    (result.get("note") or "")
-                    + f" Live GitHub index query (target-scoped). "
-                    + f"requested_max_results={requested_limit} effective_max_results={effective_limit}. "
-                    + f"query={scoped_query[:180]}"
-                )
+                sources.append("live_github_code_search")
             else:
-                data_label = "github_not_configured"
-                result = run_research(
-                    profile,
-                    store=store,
-                    fixture_path=None,
-                    github_fixture=None,
-                    allow_live_github=False,
-                    max_results=effective_limit,
-                    target_host=tv.host,
-                    research_mode="passive",
+                sources.append("github_not_configured")
+            if live_public:
+                sources.append("live_urlscan")
+                sources.append("live_cdx")
+            else:
+                sources.append("public_indexes_offline")
+            data_label = "+".join(sources)
+            result["note"] = (
+                (result.get("note") or "")
+                + f" Passive multi-provider run. "
+                + f"requested_max_results={requested_limit} effective_max_results={effective_limit}. "
+                + f"github_query={scoped_query[:180] if token else '(skipped: no token)'}. "
+                + (
+                    "URLScan/CDX live public APIs enabled; no host probing."
+                    if live_public
+                    else "URLScan/CDX live disabled (set EI_LIVE_PUBLIC_INDEXES=1 or run in Actions)."
                 )
-                if not result.get("provider_summaries"):
-                    result["provider_summaries"] = [
+            )
+            if not token:
+                summaries = list(result.get("provider_summaries") or [])
+                if not any(s.get("provider") == "github_code_search" for s in summaries):
+                    summaries.append(
                         {
                             "provider": "github_code_search",
                             "status": "NOT_CONFIGURED",
@@ -200,12 +221,11 @@ def run_actions_job(
                             "records_normalized": 0,
                             "coverage_notes": (
                                 "Set repository secret EI_GITHUB_TOKEN (or GITHUB_TOKEN) "
-                                "to enable live index search. Queries are target-scoped."
+                                "to enable live GitHub code search."
                             ),
                         }
-                    ]
-                    if result.get("status") in (None, "COMPLETED_ZERO", "NOT_RUN"):
-                        result["status"] = "NOT_CONFIGURED"
+                    )
+                    result["provider_summaries"] = summaries
         result["requested_max_results"] = requested_limit
         result["effective_max_results"] = effective_limit
         result["scoped_github_query"] = scoped_query if mode != "demo" else "(demo fixtures)"

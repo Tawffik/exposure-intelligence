@@ -12,7 +12,7 @@ This repository is the implementation of the [Exposure Intelligence project char
 - **Explainable classification and ranking** — scores come with reason codes; an exposed artifact is not automatically a vulnerability.
 - **Safety first** — offline fixtures by default; secrets are redacted; no live probing without separate authorization policy (not enabled in MVP).
 
-## Status (v0.1.5)
+## Status (v0.2.0)
 
 | Capability | Status |
 | --- | --- |
@@ -21,13 +21,19 @@ This repository is the implementation of the [Exposure Intelligence project char
 | Source-fidelity labels | Implemented |
 | Honest run states | Implemented |
 | Deterministic content-shape classifier | Implemented + tested |
-| Source maps / directory listings / OpenAPI / git metadata shapes | Implemented + tested (v0.1.1) |
+| Source maps / directory listings / OpenAPI / git metadata shapes | Implemented + tested |
 | Provenance + redaction | Implemented + tested |
 | Correlation + explainable ranking | Implemented + tested |
 | Automated tests + CI workflow | Implemented |
-| Live providers (GitHub search, URLScan, CDX) | Not yet |
-| Target authorization registry / active probes | Not yet |
-| Persistent store / scheduler | Not yet |
+| GitHub Actions target-to-report workflow | Implemented |
+| GitHub Code Search provider (fixture + live) | Implemented + tested |
+| URLScan public search provider (fixture + live) | Implemented + tested |
+| Internet Archive CDX provider (fixture + live) | Implemented + tested |
+| Target-scoped queries + relationship labels | Implemented + tested |
+| Mode-compatible history (demo vs passive) | Implemented + tested |
+| SQLite persistence (best-effort Actions cache) | Implemented |
+| Active host probes / full auth registry | Not yet |
+| Daily scheduler | Not yet (manual workflow_dispatch first) |
 
 ## Requirements
 

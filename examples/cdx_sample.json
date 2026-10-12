@@ -1,0 +1,29 @@
+{
+  "_ei_query": "example-authorized.test/*",
+  "results": [
+    {
+      "timestamp": "20230101120000",
+      "original": "https://example-authorized.test/backup.zip",
+      "statuscode": "200",
+      "mimetype": "application/zip",
+      "digest": "ABCD1234",
+      "length": "1048576"
+    },
+    {
+      "timestamp": "20230215153000",
+      "original": "https://example-authorized.test/static/app.js.map",
+      "statuscode": "200",
+      "mimetype": "application/json",
+      "digest": "EFGH5678",
+      "length": "2048"
+    },
+    {
+      "timestamp": "20230301090000",
+      "original": "https://example-authorized.test/robots.txt",
+      "statuscode": "200",
+      "mimetype": "text/plain",
+      "digest": "IJKL9012",
+      "length": "64"
+    }
+  ]
+}
