@@ -253,10 +253,9 @@ def main(argv: list[str] | None = None) -> int:
             return 3
         return 0
 
-    parser.print_help()
-    
     if args.command == "benchmark":
         from ei.benchmark import run_classification_benchmark
+
         corpus = args.corpus or (root / "examples" / "classification_benchmark.json")
         if not corpus.exists():
             print(f"Corpus not found: {corpus}", file=sys.stderr)
@@ -265,11 +264,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report.to_dict(), indent=2))
         if args.output:
             args.output.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
-        # Exit 0 if perfect classification accuracy, 1 otherwise (gate)
         return 0 if report.classification_accuracy >= 1.0 else 1
 
     if args.command == "registry":
         from ei.registry import load_registry, registry_summary
+
         result = load_registry(args.path)
         out = {
             "ok": result.ok,
@@ -281,7 +280,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(out, indent=2))
         return 0 if result.ok else 1
 
-return 2
+    parser.print_help()
+    return 2
 
 
 if __name__ == "__main__":
