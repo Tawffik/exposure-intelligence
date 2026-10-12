@@ -1,0 +1,135 @@
+# Manual Exposure Intelligence research: target → report artifacts
+# Operator UX: Actions → Exposure Intelligence Research → Run workflow
+name: Exposure Intelligence Research
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Hostname/domain only (e.g. example.com). No shell metacharacters. Live host probing is OFF by default."
+        required: true
+        type: string
+      research_mode:
+        description: "passive = public GitHub index when GITHUB_TOKEN is set; demo = offline fixtures only (never labeled as live)."
+        required: true
+        type: choice
+        options:
+          - passive
+          - demo
+        default: passive
+      authorization_status:
+        description: "Program authorization for THIS target. UNKNOWN keeps live host requests denied. ACTIVE does not enable host probing in this workflow version."
+        required: true
+        type: choice
+        options:
+          - UNKNOWN
+          - ACTIVE
+          - PAUSED
+          - EXPIRED
+        default: UNKNOWN
+      github_query:
+        description: "GitHub code-search query (passive index only). Ignored in demo mode."
+        required: false
+        type: string
+        default: "filename:.env OR filename:.env.example OR extension:map"
+      max_results:
+        description: "Max GitHub code-search results (1–30)."
+        required: false
+        type: string
+        default: "10"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ei-research-${{ github.event.inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Restore research history cache
+        uses: actions/cache@v4
+        with:
+          path: ei_data
+          key: ei-history-${{ runner.os }}-${{ github.event.inputs.target }}-${{ github.run_id }}
+          restore-keys: |
+            ei-history-${{ runner.os }}-${{ github.event.inputs.target }}-
+            ei-history-${{ runner.os }}-
+
+      - name: Run research job
+        id: research
+        env:
+          # Prefer Actions-provided token for api.github.com code search (public code).
+          # Repository secret GITHUB_TOKEN is the default GITHUB_TOKEN in Actions;
+          # operators may also set a PAT secret named EI_GITHUB_TOKEN with code search scope.
+          GITHUB_TOKEN: ${{ secrets.EI_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          EI_TARGET: ${{ github.event.inputs.target }}
+          EI_MODE: ${{ github.event.inputs.research_mode }}
+          EI_AUTH_STATUS: ${{ github.event.inputs.authorization_status }}
+          EI_QUERY: ${{ github.event.inputs.github_query }}
+          EI_MAX_RESULTS: ${{ github.event.inputs.max_results }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p ei_data artifacts
+          python -m ei.cli actions-run \
+            --target "${EI_TARGET}" \
+            --mode "${EI_MODE}" \
+            --authorization-status "${EI_AUTH_STATUS}" \
+            --github-query "${EI_QUERY}" \
+            --max-results "${EI_MAX_RESULTS}" \
+            --db ei_data/research.db \
+            --out artifacts \
+            --commit-sha "${GITHUB_SHA}" \
+            --workflow-run-id "${GITHUB_RUN_ID}"
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## Exposure Intelligence"
+            echo ""
+            if [ -f artifacts/run-metadata.json ]; then
+              echo '```json'
+              head -c 4000 artifacts/run-metadata.json
+              echo ''
+              echo '```'
+            else
+              echo "No run-metadata.json produced."
+            fi
+            echo ""
+            echo "Download **artifacts** from this run for the full report bundle."
+            echo ""
+            echo "Public index leads are not confirmed production findings. Live host probing is not performed by this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ei-report-${{ github.event.inputs.target }}-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Save history directory for cache
+        if: always()
+        run: mkdir -p ei_data && ls -la ei_data || true

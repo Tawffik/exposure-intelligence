@@ -13,6 +13,7 @@ from ei.profile import load_profile, validate_profile
 from ei.research import run_research
 from ei.shadow import run_shadow_from_paths
 from ei.store import ResearchStore
+from ei.actions_run import run_actions_job
 
 
 def _print_report_summary(report) -> None:
@@ -85,6 +86,21 @@ def main(argv: list[str] | None = None) -> int:
     hist.add_argument("--db", type=Path, default=Path("ei_data/research.db"))
     hist.add_argument("--target-id", required=True)
     hist.add_argument("--limit", type=int, default=20)
+
+    ar = sub.add_parser(
+        "actions-run",
+        help="Headless Actions job: validate target, research, write report bundle",
+    )
+    ar.add_argument("--target", required=True, help="Hostname/domain")
+    ar.add_argument("--mode", default="passive", choices=["passive", "demo"])
+    ar.add_argument("--authorization-status", default="UNKNOWN")
+    ar.add_argument("--github-query", default="filename:.env OR filename:.env.example OR extension:map")
+    ar.add_argument("--max-results", default="10")
+    ar.add_argument("--db", type=Path, default=Path("ei_data/research.db"))
+    ar.add_argument("--out", type=Path, default=Path("artifacts"))
+    ar.add_argument("--profile", type=Path, default=None)
+    ar.add_argument("--commit-sha", default="")
+    ar.add_argument("--workflow-run-id", default="")
 
     args = parser.parse_args(argv)
     root = Path(__file__).resolve().parents[1]
@@ -187,6 +203,42 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             store.close()
         print(json.dumps({"target_id": args.target_id, "runs": runs}, indent=2))
+        return 0
+
+
+    if args.command == "actions-run":
+        result = run_actions_job(
+            target=args.target,
+            out_dir=args.out,
+            db_path=args.db,
+            research_mode=args.mode,
+            authorization_status=args.authorization_status,
+            github_query=args.github_query,
+            max_github_results=int(args.max_results) if str(args.max_results).isdigit() else 10,
+            profile_path=args.profile,
+            commit_sha=args.commit_sha,
+            workflow_run_id=args.workflow_run_id,
+        )
+        # Print compact summary (no secrets)
+        public = {
+            "ok": result.get("ok", True) if "error" not in result else False,
+            "status": result.get("status"),
+            "target_host": result.get("target_host"),
+            "run_id": result.get("run_id"),
+            "data_source_label": result.get("data_source_label"),
+            "summary": result.get("summary"),
+            "provider_summaries": result.get("provider_summaries"),
+            "artifact_paths": result.get("artifact_paths"),
+            "error": result.get("error"),
+            "details": result.get("details"),
+        }
+        print(json.dumps(public, indent=2))
+        if result.get("error"):
+            return 2
+        if result.get("status") in ("ERROR",):
+            return 1
+        if result.get("status") in ("PARTIAL", "RATE_LIMITED", "NOT_CONFIGURED"):
+            return 3
         return 0
 
     parser.print_help()

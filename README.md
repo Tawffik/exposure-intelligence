@@ -12,7 +12,7 @@ This repository is the implementation of the [Exposure Intelligence project char
 - **Explainable classification and ranking** — scores come with reason codes; an exposed artifact is not automatically a vulnerability.
 - **Safety first** — offline fixtures by default; secrets are redacted; no live probing without separate authorization policy (not enabled in MVP).
 
-## Status (v0.1.3)
+## Status (v0.1.4)
 
 | Capability | Status |
 | --- | --- |
@@ -78,7 +78,28 @@ python -m ei.cli run examples/sample_observations.json -o /tmp/out.json
 
 
 
-## Operational workflow (v0.1.3)
+
+## GitHub Actions (phone-friendly)
+
+1. Open the repo on GitHub → **Actions**
+2. Select **Exposure Intelligence Research**
+3. **Run workflow**
+4. Enter **target** (hostname only, e.g. `example.com`)
+5. Choose **research_mode**: `passive` (live GitHub index if token available) or `demo` (offline fixtures)
+6. Leave **authorization_status** as `UNKNOWN` unless you intentionally document program auth (live host probing remains off in this workflow)
+7. Start the run → open the finished job → download **Artifacts** (`ei-report-<target>-<run_id>`)
+
+Bundle includes: `report.md`, `evidence.json`, `research-queue.md`, `run-diff.*`, `coverage-and-errors.md`, `run-metadata.json`.
+
+Local equivalent:
+
+```bash
+python -m ei.cli actions-run --target example.com --mode demo --out artifacts --db ei_data/research.db
+```
+
+History across Actions runs uses a best-effort cache of `ei_data/` (not guaranteed durable). Reports never treat cache miss as a clean negative.
+
+## Operational workflow (v0.1.4)
 
 ```bash
 # 1. Validate program profile
