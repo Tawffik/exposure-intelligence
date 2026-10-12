@@ -1,0 +1,27 @@
+{
+  "schema_version": "1",
+  "targets": [
+    {
+      "target_id": "example-authorized-test",
+      "program_name": "Example Authorized Program",
+      "authorization_status": "UNKNOWN",
+      "authorization_reference": "https://example.com/security",
+      "in_scope_hosts": ["example-authorized.test"],
+      "in_scope_domains": ["example-authorized.test"],
+      "allowed_operations": ["PASSIVE_INDEX", "HISTORICAL"],
+      "notes": "Passive-only demo target; not for live host probing.",
+      "profile_version": "registry-1"
+    },
+    {
+      "target_id": "active-demo-local",
+      "program_name": "Local Active Probe Demo",
+      "authorization_status": "ACTIVE",
+      "authorization_reference": "operator-local-only",
+      "in_scope_hosts": ["example-authorized.test"],
+      "in_scope_domains": ["example-authorized.test"],
+      "allowed_operations": ["PASSIVE_INDEX", "HISTORICAL", "CURRENT_OBSERVATION_HEAD"],
+      "notes": "ACTIVE only for tests; host is non-routable example.",
+      "profile_version": "registry-1"
+    }
+  ]
+}

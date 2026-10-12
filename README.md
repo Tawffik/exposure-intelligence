@@ -12,7 +12,7 @@ This repository is the implementation of the [Exposure Intelligence project char
 - **Explainable classification and ranking** — scores come with reason codes; an exposed artifact is not automatically a vulnerability.
 - **Safety first** — offline fixtures by default; secrets are redacted; no live probing without separate authorization policy (not enabled in MVP).
 
-## Status (v0.2.0)
+## Status (v0.3.0)
 
 | Capability | Status |
 | --- | --- |
@@ -32,8 +32,13 @@ This repository is the implementation of the [Exposure Intelligence project char
 | Target-scoped queries + relationship labels | Implemented + tested |
 | Mode-compatible history (demo vs passive) | Implemented + tested |
 | SQLite persistence (best-effort Actions cache) | Implemented |
-| Active host probes / full auth registry | Not yet |
-| Daily scheduler | Not yet (manual workflow_dispatch first) |
+| Bounded current-state probes (fail-closed ACTIVE) | Implemented + tested |
+| Target registry JSON | Implemented + tested |
+| Classification benchmark CLI + corpus | Implemented (accuracy gate) |
+| Versioned export adapter (ei.export.v1) | Implemented |
+| Evidence review (path vs content) | Implemented + tested |
+| Daily scheduler | Not yet (manual workflow_dispatch; charter after probe stability) |
+| Paid indexes (Shodan/FOFA/VT) | Deferred per charter |
 
 ## Requirements
 
@@ -214,3 +219,24 @@ MIT
 1. Target-profile schema + fail-closed policy gate (still offline)
 2. First passive provider adapter (GitHub code search) behind the same observation contract, shadow mode only
 3. Expand labeled fixture corpus and measure precision denominators
+
+
+## Benchmark (classification quality gate)
+
+```bash
+ei benchmark
+# or: python -m ei.cli benchmark -o /tmp/bench.json
+```
+
+Labeled corpus: `examples/classification_benchmark.json`.
+Exit code 0 only when classification accuracy is 100% on the corpus.
+
+## Target registry
+
+```bash
+ei registry examples/targets_registry.json
+```
+
+## Export bundle
+
+Each Actions/report run writes `export-v1.json` (`schema: ei.export.v1`) for downstream consumers. Candidates are leads — never confirmed findings.

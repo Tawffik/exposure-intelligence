@@ -102,6 +102,18 @@ def main(argv: list[str] | None = None) -> int:
     ar.add_argument("--commit-sha", default="")
     ar.add_argument("--workflow-run-id", default="")
 
+    bm = sub.add_parser("benchmark", help="Run classification/evidence-review benchmark corpus")
+    bm.add_argument(
+        "--corpus",
+        type=Path,
+        default=None,
+        help="Labeled JSON corpus (default: examples/classification_benchmark.json)",
+    )
+    bm.add_argument("-o", "--output", type=Path, default=None)
+
+    reg = sub.add_parser("registry", help="List/validate authorized target registry JSON")
+    reg.add_argument("path", type=Path, help="Registry JSON path")
+
     args = parser.parse_args(argv)
     root = Path(__file__).resolve().parents[1]
 
@@ -242,7 +254,34 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     parser.print_help()
-    return 2
+    
+    if args.command == "benchmark":
+        from ei.benchmark import run_classification_benchmark
+        corpus = args.corpus or (root / "examples" / "classification_benchmark.json")
+        if not corpus.exists():
+            print(f"Corpus not found: {corpus}", file=sys.stderr)
+            return 2
+        report = run_classification_benchmark(corpus)
+        print(json.dumps(report.to_dict(), indent=2))
+        if args.output:
+            args.output.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+        # Exit 0 if perfect classification accuracy, 1 otherwise (gate)
+        return 0 if report.classification_accuracy >= 1.0 else 1
+
+    if args.command == "registry":
+        from ei.registry import load_registry, registry_summary
+        result = load_registry(args.path)
+        out = {
+            "ok": result.ok,
+            "path": result.path,
+            "errors": result.errors,
+            "targets": registry_summary(result.profiles),
+            "count": len(result.profiles),
+        }
+        print(json.dumps(out, indent=2))
+        return 0 if result.ok else 1
+
+return 2
 
 
 if __name__ == "__main__":

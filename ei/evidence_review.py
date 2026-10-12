@@ -208,7 +208,16 @@ def review_candidate(
     elif any(r.startswith("secret_pattern:") for r in (reason_codes or [])):
         decision = "POTENTIAL_EXPOSURE_UNCONFIRMED"
         rationale_parts.append("Classifier reported a secret_pattern reason code.")
-    elif classification in {"SPA_SHELL", "GENERIC_ERROR", "AUTH_REQUIRED", "INTENTIONALLY_PUBLIC", "KEYWORD_FALSE_POSITIVE"}:
+    elif classification in {
+        "SPA_SHELL",
+        "GENERIC_ERROR",
+        "AUTH_REQUIRED",
+        "INTENTIONALLY_PUBLIC",
+        "KEYWORD_FALSE_POSITIVE",
+        "EMPTY_RESPONSE",
+        "UNREACHABLE",
+        "DUPLICATE",
+    }:
         decision = "LOW_PRIORITY"
         rationale_parts.append(f"Classification {classification} is a low-priority/noise class.")
     else:
