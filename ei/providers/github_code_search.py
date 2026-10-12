@@ -111,6 +111,38 @@ def build_target_scoped_query_variants(target_host: str, base_terms: str = "", *
     return queries
 
 
+def _dns_token_present(text: str, host: str) -> bool:
+    """True if host appears as a DNS-boundary token (not inside notexample.com)."""
+    if not text or not host:
+        return False
+    hay = text.lower()
+    needle = host.lower()
+    start = 0
+    while True:
+        i = hay.find(needle, start)
+        if i < 0:
+            return False
+        before = hay[i - 1] if i > 0 else ""
+        after = hay[i + len(needle)] if i + len(needle) < len(hay) else ""
+        # Boundary: not extending a larger domain/label
+        if before and (before.isalnum() or before in "-_."):
+            start = i + 1
+            continue
+        if after and (after.isalnum() or after in "-_"):
+            # allow after '.' only if next part is not continuing same token wrongly —
+            # e.g. example.com.attacker is a different host; treat as non-match for exact host
+            if after == ".":
+                start = i + 1
+                continue
+            start = i + 1
+            continue
+        return True
+
+
+def _path_segments(path: str) -> list[str]:
+    return [s for s in (path or "").replace("\\", "/").lower().split("/") if s]
+
+
 def classify_index_relationship(
     *,
     target_host: str,
@@ -122,50 +154,104 @@ def classify_index_relationship(
     """
     Classify how a public-index hit relates to the selected target.
 
+    A textual substring is recorded separately from relationship.
+    GitHub blob URLs are source artifact locations, not the target application.
     Never returns VERIFIED_DISCLOSURE — index evidence alone is insufficient.
+    DIRECT_TARGET_REFERENCE requires a DNS-boundary host token in the *path*
+    (as a full path segment or filename stem), not merely body text or a
+    substring inside another domain (notexample.com).
     """
     host = (target_host or "").strip().lower().rstrip(".")
-    blob = " ".join(
-        [
-            item_path or "",
-            repo_full_name or "",
-            body_snippet or "",
-            html_url or "",
-        ]
-    ).lower()
+    path = (item_path or "").strip()
+    repo = (repo_full_name or "").strip()
+    body = (body_snippet or "").strip()
+    # Do NOT treat github html_url as evidence of target relationship —
+    # it always contains github.com, and may embed the query host in odd ways.
     if not host:
         return {
             "relationship": "UNATTRIBUTED",
             "rationale": "No target host provided.",
+            "textual_match": False,
+            "textual_match_fields": [],
         }
-    if host in blob:
+
+    fields: list[str] = []
+    if _dns_token_present(path, host):
+        fields.append("path")
+    if _dns_token_present(repo, host):
+        fields.append("repo")
+    if _dns_token_present(body, host):
+        fields.append("body")
+    textual = bool(fields)
+
+    # DIRECT: host is an exact path segment (e.g. configs/example.com/secrets.env)
+    # or the filename is exactly the host / host with a single extension.
+    segments = _path_segments(path)
+    direct = False
+    if host in segments:
+        direct = True
+        reason = f"Path contains exact segment '{host}'."
+    else:
+        fname = segments[-1] if segments else ""
+        # example.com, example.com.env, example.com.backup
+        if fname == host or fname.startswith(host + "."):
+            # reject notexample.com when host is example.com — already boundary-safe via startswith only if fname starts with host+'.'
+            # but notexample.com.startswith('example.com.') is False; good
+            # example.com.attacker.test as filename is still a path claim about that name
+            direct = True
+            reason = f"Filename '{fname}' is host-prefixed."
+
+    if direct:
         return {
             "relationship": "DIRECT_TARGET_REFERENCE",
-            "rationale": f"Index artifact text/path/repo explicitly contains '{host}'.",
+            "rationale": reason + " Index-only evidence; not verified production exposure.",
+            "textual_match": True,
+            "textual_match_fields": fields or ["path"],
         }
-    # apex / label heuristics
-    labels = host.split(".")
-    apex = ".".join(labels[-2:]) if len(labels) >= 2 else host
-    if apex and apex != host and apex in blob:
-        return {
-            "relationship": "RELATED_CANDIDATE",
-            "rationale": f"Index artifact references apex '{apex}' but not exact host '{host}'.",
-        }
-    # org-ish token (first label) — weak
-    if labels and len(labels[0]) >= 4 and labels[0] in blob:
+
+    if "path" in fields or "repo" in fields:
         return {
             "relationship": "RELATED_CANDIDATE",
             "rationale": (
-                f"Weak token match on '{labels[0]}'; not proof of relationship to '{host}'."
+                f"DNS-boundary token for '{host}' found in {','.join(fields)} but not as an "
+                "exact path segment/filename. Plausible, unproven relationship."
             ),
+            "textual_match": True,
+            "textual_match_fields": fields,
         }
+
+    if "body" in fields:
+        return {
+            "relationship": "INDEX_ONLY",
+            "rationale": (
+                f"Host '{host}' appears only in snippet text. Public-index hit; "
+                "not a defensible target finding."
+            ),
+            "textual_match": True,
+            "textual_match_fields": fields,
+        }
+
+    # Apex weak match (example.com vs www.example.com path) — RELATED if apex in path with boundary
+    labels = host.split(".")
+    apex = ".".join(labels[-2:]) if len(labels) >= 2 else host
+    if apex != host and (_dns_token_present(path, apex) or _dns_token_present(repo, apex)):
+        return {
+            "relationship": "RELATED_CANDIDATE",
+            "rationale": f"Apex '{apex}' present with DNS boundaries; exact host '{host}' not established.",
+            "textual_match": True,
+            "textual_match_fields": ["apex"],
+        }
+
     return {
         "relationship": "INDEX_ONLY",
         "rationale": (
-            "Public index hit without a clear textual reference to the selected target. "
-            "Do not treat as a target finding."
+            "Public index hit without a DNS-boundary reference to the selected target "
+            "in path, repo name, or body. Do not treat as a target finding."
         ),
+        "textual_match": textual,
+        "textual_match_fields": fields,
     }
+
 
 
 def _text_match_fragment(item: dict[str, Any]) -> str:
@@ -240,6 +326,8 @@ def normalize_github_item(
             "provider": PROVIDER_NAME,
             "target_relationship": rel["relationship"],
             "target_relationship_rationale": rel["rationale"],
+            "textual_match": rel.get("textual_match", False),
+            "textual_match_fields": rel.get("textual_match_fields") or [],
             "selected_target_host": target_host,
         },
     }
