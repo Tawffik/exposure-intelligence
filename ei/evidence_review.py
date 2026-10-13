@@ -49,6 +49,13 @@ FIXTURE_PATH_RE = re.compile(
     r"fixture/react|/sample|/mock[s]?/|/demo/)"
 )
 
+PRIVATE_OR_LOCAL_RE = re.compile(
+    r"(?i)(\b127\.0\.0\.1\b|\blocalhost\b|\b0\.0\.0\.0\b|"
+    r"\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|"
+    r"\b192\.168\.\d{1,3}\.\d{1,3}\b|"
+    r"\b172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}\b)"
+)
+
 EXAMPLE_PATH_RE = re.compile(
     r"(?i)("
     r"\.env\.example|"
@@ -214,6 +221,16 @@ def review_candidate(
     if basis["example_or_template_path"]:
         decision = "LOW_PRIORITY"
         rationale_parts.append("Path looks like an example/template file.")
+
+    # Hunter guidance (Orwa et al.): credentials bound to localhost/private IPs
+    # are almost never reportable as target production exposure.
+    body_l = (body_preview_redacted or "") + " " + (url or "")
+    if PRIVATE_OR_LOCAL_RE.search(body_l) and not basis["example_or_template_path"]:
+        decision = "LOW_PRIORITY"
+        rationale_parts.append(
+            "Snippet/URL references localhost or private RFC1918 address — "
+            "typically non-reportable for production scope (hunter playbook)."
+        )
     elif basis["evidence_basis"] == "path_only" and not secret_like_keys:
         decision = "LOW_PRIORITY"
         rationale_parts.append(
