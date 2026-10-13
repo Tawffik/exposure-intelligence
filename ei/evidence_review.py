@@ -46,8 +46,11 @@ LONG_TOKEN_RE = re.compile(r"^[A-Za-z0-9/+=_\-.]{16,}$")
 
 EXAMPLE_PATH_RE = re.compile(
     r"(?i)(\.env\.example|\.env\.sample|\.env\.template|\.env\.dist|"
-    r"example\.env|config\.example|credentials\.example|/examples?/)"
+    r"example\.env|config\.example|credentials\.example|/examples?/|"
+    r"workshop|demo-store|hydrogen-demo|tutorial|getting-started|"
+    r"sample-app|starter-template)"
 )
+
 SENSITIVE_NAME_RE = re.compile(
     r"(?i)(\.env($|\.)|credentials|secret|id_rsa|\.pem|backup|dump|wp-config)"
 )
@@ -217,6 +220,7 @@ def review_candidate(
         "EMPTY_RESPONSE",
         "UNREACHABLE",
         "DUPLICATE",
+        "HISTORICAL_ONLY",
     }:
         decision = "LOW_PRIORITY"
         rationale_parts.append(f"Classification {classification} is a low-priority/noise class.")

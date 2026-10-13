@@ -26,6 +26,28 @@ PROVIDER_NAME = "internet_archive_cdx"
 CHECK_FAMILY = "historical_url_index"
 DEFAULT_API = "https://web.archive.org/cdx/search/cdx"
 USER_AGENT = "ExposureIntelligence/0.2.0 (passive-research; +https://github.com/Tawffik/exposure-intelligence)"
+
+def _is_junk_url(url: str) -> bool:
+    """Drop clearly malformed/noisy archive originals."""
+    u = url or ""
+    if not u.startswith(("http://", "https://")):
+        return True
+    bad_tokens = ("%0a", "%0d", "%22", "%27", "!!!!!", "!==", "/%22", "\n")
+    low = u.lower()
+    if any(b in low for b in bad_tokens):
+        return True
+    # Bare host with only port and slash is low value
+    from urllib.parse import urlparse
+    try:
+        path = urlparse(u).path or ""
+    except Exception:
+        return True
+    if path in {"", "/", ":80/", ":443/"}:
+        return True
+    if len(path) <= 1 and ":" in (urlparse(u).netloc or ""):
+        return True
+    return False
+
 DEFAULT_FL = "timestamp,original,statuscode,mimetype,digest,length"
 
 
@@ -184,8 +206,13 @@ def normalize_cdx_payload(
         return []
 
     out: list[dict[str, Any]] = []
-    for row in rows[: max(1, limit)]:
-        out.append(normalize_cdx_row(row, query=query, target_host=target_host))
+    for row in rows:
+        if len(out) >= max(1, limit):
+            break
+        rec = normalize_cdx_row(row, query=query, target_host=target_host)
+        if _is_junk_url(rec.get("url") or ""):
+            continue
+        out.append(rec)
     return out
 
 
@@ -268,6 +295,12 @@ class CDXProvider:
             params["matchType"] = match_type
         if filter_statuscode:
             params["filter"] = f"statuscode:{filter_statuscode}"
+        # Prefer URL patterns that historically correlate with disclosure leads
+        params["filter"] = params.get("filter") or ""
+        # CDX supports multiple filter params via repeated keys — use urllib list later if needed.
+        # Single regex filter on original path:
+        if not filter_statuscode:
+            params["filter"] = r"original:.*(\.(env|sql|zip|map|bak|tar|gz|pem)|backup|config|\.git|secret|dump|credentials)"
         qs = urllib.parse.urlencode(params)
         url = f"{self.api_url}?{qs}"
         headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}

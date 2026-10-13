@@ -174,6 +174,27 @@ def score_candidate(primary: Observation, group: list[Observation]) -> tuple[flo
             "rank_note=filename/path hints are not content-confirmed secrets"
         )
 
+    if primary.classification == Classification.EMPTY_RESPONSE.value:
+        score *= 0.2
+        explanation.append("empty_response_penalty")
+    if primary.classification == Classification.HISTORICAL_ONLY.value:
+        score *= 0.15
+        explanation.append("historical_only_penalty")
+    for token in (
+        "workshop",
+        "demo-store",
+        "hydrogen-demo",
+        "/examples/",
+        "tutorial",
+        "getting-started",
+        "sample-app",
+        "starter-template",
+    ):
+        if token in url_l:
+            score *= 0.4
+            explanation.append(f"demo_or_workshop_path_penalty:{token}")
+            break
+
     return round(min(1.0, score), 4), explanation
 
 
