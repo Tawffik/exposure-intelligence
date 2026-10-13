@@ -319,7 +319,14 @@ def run_research(
                 provider="urlscan",
             )
         else:
-            us_result = URLScanProvider().collect_live(host_for_q, size=max_results)
+            try:
+                us_result = URLScanProvider().collect_live(host_for_q, size=max_results)
+            except Exception as e:  # noqa: BLE001 — provider must not crash research
+                us_result = ProviderCollectResult(
+                    status=RunStatus.ERROR.value,
+                    error_summary=f"urlscan unhandled: {type(e).__name__}: {e}"[:400],
+                    provider="urlscan",
+                )
     _merge_provider(us_result, "urlscan")
 
     # --- Internet Archive CDX historical provider ---
@@ -342,7 +349,14 @@ def run_research(
                 provider="internet_archive_cdx",
             )
         else:
-            cdx_result = CDXProvider().collect_live(host_for_q, limit=max_results)
+            try:
+                cdx_result = CDXProvider().collect_live(host_for_q, limit=max_results)
+            except Exception as e:  # noqa: BLE001
+                cdx_result = ProviderCollectResult(
+                    status=RunStatus.ERROR.value,
+                    error_summary=f"cdx unhandled: {type(e).__name__}: {e}"[:400],
+                    provider="internet_archive_cdx",
+                )
     _merge_provider(cdx_result, "internet_archive_cdx")
 
     # --- Bounded current-state probes (fail-closed; ACTIVE only) ---

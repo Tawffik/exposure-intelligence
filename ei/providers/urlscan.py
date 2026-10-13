@@ -260,7 +260,7 @@ class URLScanProvider:
                 provider=PROVIDER_NAME,
                 actual_queries=[query],
             )
-        except urllib.error.URLError as e:
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
             return ProviderCollectResult(
                 status=RunStatus.ERROR.value,
                 error_summary=f"Network error: {e}",

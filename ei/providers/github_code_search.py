@@ -16,6 +16,7 @@ PASSIVE_INDEX leads, not confirmed findings.
 from __future__ import annotations
 
 import json
+import time
 import os
 import urllib.error
 import urllib.parse
@@ -526,6 +527,7 @@ class GitHubCodeSearchProvider:
                 break
             remaining = max_total - len(merged)
             r = self.collect_live(q, per_page=min(per_page, remaining), target_host=target_host)
+            time.sleep(0.8)  # soft pacing against secondary rate limits
             notes.append(f"{q!r}->{r.status}/{len(r.records)}")
             if r.status == RunStatus.NOT_CONFIGURED.value:
                 return r

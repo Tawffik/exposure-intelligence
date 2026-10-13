@@ -227,7 +227,7 @@ class CDXProvider:
         self,
         *,
         api_url: str = DEFAULT_API,
-        timeout: float = 30.0,
+        timeout: float = 20.0,
     ) -> None:
         self.api_url = api_url
         self.timeout = timeout
@@ -335,7 +335,7 @@ class CDXProvider:
                 provider=PROVIDER_NAME,
                 actual_queries=[url],
             )
-        except urllib.error.URLError as e:
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
             return ProviderCollectResult(
                 status=RunStatus.ERROR.value,
                 error_summary=f"Network error: {e}",
