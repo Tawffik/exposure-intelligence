@@ -241,7 +241,7 @@ def run_research(
                 gq = github_live_query or ""
                 if gq.lower().startswith("family:") or not gq.strip():
                     fam = gq.split(":", 1)[1].strip() if ":" in gq else "all"
-                    terms = select_query_terms(family=fam or "all", limit=max(1, min(int(max_results), 16)))
+                    terms = select_query_terms(family=fam or "all", limit=max(1, min(int(max_results), 6)))
                     variants = [f"{host_for_q} {term}" for term in terms]
                 else:
                     variants = build_target_scoped_query_variants(host_for_q, gq, limit=8)

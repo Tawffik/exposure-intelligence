@@ -473,6 +473,13 @@ class GitHubCodeSearchProvider:
                     error_summary=f"HTTP 403 rate limited: {err_body[:200]}",
                     query=query,
                 )
+            if e.code == 429:
+                # Secondary rate limit — stop multi-query early as RATE_LIMITED
+                return ProviderCollectResult(
+                    status=RunStatus.RATE_LIMITED.value,
+                    error_summary=f"HTTP 429: {err_body[:200]}",
+                    query=query,
+                )
             if e.code in (401, 403):
                 return ProviderCollectResult(
                     status=RunStatus.ERROR.value,
