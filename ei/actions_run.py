@@ -166,9 +166,12 @@ def run_actions_job(
             token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
             # Public index APIs (URLScan/CDX) default on in GitHub Actions, or when
             # EI_LIVE_PUBLIC_INDEXES=1. Local/unit runs stay offline unless opted in.
+            # Live public indexes only when explicitly opted in.
+            # GITHUB_ACTIONS alone is true for CI pytest too — do not treat that as live.
+            # Research workflow sets EI_ACTIONS_JOB=1; operators may set EI_LIVE_PUBLIC_INDEXES=1.
             live_public = (
-                os.environ.get("GITHUB_ACTIONS") == "true"
-                or os.environ.get("EI_LIVE_PUBLIC_INDEXES", "").strip() == "1"
+                os.environ.get("EI_LIVE_PUBLIC_INDEXES", "").strip() == "1"
+                or os.environ.get("EI_ACTIONS_JOB", "").strip() == "1"
             )
             result = run_research(
                 profile,
