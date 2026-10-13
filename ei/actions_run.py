@@ -60,6 +60,15 @@ def build_profile_for_target(
     )
 
 
+
+def _resolve_github_live_query(github_query: str) -> str:
+    """Map operator query to multi-family search when OR default or empty."""
+    q = (github_query or "").strip()
+    if not q or " OR " in q.upper() or q.lower().startswith("family:"):
+        return "family:all"
+    return q
+
+
 def run_actions_job(
     *,
     target: str,
