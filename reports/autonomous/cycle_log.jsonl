@@ -1,0 +1,20 @@
+{"cycle": 1, "title": "Repository and Evidence Baseline", "decision": "baseline established; 144+ tests green", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 2, "title": "Provider Reliability (prior PARTIAL fixes present)", "decision": "verified existing PARTIAL retention", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 3, "title": "Content availability semantics constants", "decision": "added CONTENT_* constants", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 4, "title": "Run state FIRST_SEEN already present", "decision": "verified", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 5, "title": "Evidence ledger via store.py", "decision": "verified existing", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 6, "title": "Scope attribution DNS-boundary", "decision": "verified prior P0", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 7, "title": "Content-aware triage EXAMPLE_PATH_RE fix", "decision": "FIXED .env.local.example demotion", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 8, "title": "Public artifacts via query families", "decision": "verified", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 9, "title": "JS source maps benchmark case", "decision": "added", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 10, "title": "API/schema OpenAPI benchmark case", "decision": "added", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 11, "title": "Historical CDX (existing)", "decision": "verified", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 12, "title": "Errors/diagnostics (classifier markers)", "decision": "verified", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 13, "title": "Indirect disclosure lab", "decision": "deferred \u2014 requires ACTIVE/lab", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 14, "title": "Cross-source correlation (store keys)", "decision": "verified existing", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 15, "title": "Hypothesis engine", "decision": "implemented ei/hypothesis.py", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 16, "title": "Ranking reason codes", "decision": "verified existing + org boost", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 17, "title": "Benchmark expansion", "decision": "9 \u2192 13 cases, accuracy 1.0", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 18, "title": "BugBountyCI overlap", "decision": "documented; no hard dependency", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 19, "title": "E2E offline suite", "decision": "pytest full green", "timestamp": "2026-10-13T23:10:56Z"}
+{"cycle": 20, "title": "Release decision", "decision": "READY_WITH_LIMITATIONS", "timestamp": "2026-10-13T23:10:56Z"}

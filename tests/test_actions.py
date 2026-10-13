@@ -120,6 +120,8 @@ def test_actions_run_passive_without_token_is_not_configured():
         td = Path(td)
         env_tok = os.environ.pop("GITHUB_TOKEN", None)
         env_gh = os.environ.pop("GH_TOKEN", None)
+        env_job = os.environ.pop("EI_ACTIONS_JOB", None)
+        env_live = os.environ.pop("EI_LIVE_PUBLIC_INDEXES", None)
         try:
             result = run_actions_job(
                 target="example.com",
@@ -134,3 +136,7 @@ def test_actions_run_passive_without_token_is_not_configured():
                 os.environ["GITHUB_TOKEN"] = env_tok
             if env_gh is not None:
                 os.environ["GH_TOKEN"] = env_gh
+            if env_job is not None:
+                os.environ["EI_ACTIONS_JOB"] = env_job
+            if env_live is not None:
+                os.environ["EI_LIVE_PUBLIC_INDEXES"] = env_live

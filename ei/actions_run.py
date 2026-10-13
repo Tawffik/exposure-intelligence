@@ -14,6 +14,7 @@ from typing import Any, Optional
 
 from ei.profile import ProgramProfile, profile_from_dict, validate_profile
 from ei.report import write_report_bundle
+from ei.query_families import select_query_terms
 from ei.research import run_research
 from ei.store import ResearchStore
 from ei.validate_input import sanitize_target_input, validate_budget
@@ -57,6 +58,15 @@ def build_profile_for_target(
             "profile_version": "actions-1",
         }
     )
+
+
+
+def _resolve_github_live_query(github_query: str) -> str:
+    """Map operator query to multi-family search when OR default or empty."""
+    q = (github_query or "").strip()
+    if not q or " OR " in q.upper() or q.lower().startswith("family:"):
+        return "family:all"
+    return q
 
 
 def run_actions_job(
@@ -166,9 +176,12 @@ def run_actions_job(
             token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
             # Public index APIs (URLScan/CDX) default on in GitHub Actions, or when
             # EI_LIVE_PUBLIC_INDEXES=1. Local/unit runs stay offline unless opted in.
+            # Live public indexes only when explicitly opted in.
+            # GITHUB_ACTIONS alone is true for CI pytest too — do not treat that as live.
+            # Research workflow sets EI_ACTIONS_JOB=1; operators may set EI_LIVE_PUBLIC_INDEXES=1.
             live_public = (
-                os.environ.get("GITHUB_ACTIONS") == "true"
-                or os.environ.get("EI_LIVE_PUBLIC_INDEXES", "").strip() == "1"
+                os.environ.get("EI_LIVE_PUBLIC_INDEXES", "").strip() == "1"
+                or os.environ.get("EI_ACTIONS_JOB", "").strip() == "1"
             )
             result = run_research(
                 profile,
@@ -176,7 +189,7 @@ def run_actions_job(
                 fixture_path=None,
                 github_fixture=None,
                 github_live_query=(
-                    (github_query or "filename:.env OR extension:map") if token else None
+                    _resolve_github_live_query(github_query) if token else None
                 ),
                 allow_live_github=bool(token),
                 urlscan_fixture=None,

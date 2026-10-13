@@ -44,11 +44,28 @@ SECRET_LIKE_SHAPE_RE = re.compile(
 )
 LONG_TOKEN_RE = re.compile(r"^[A-Za-z0-9/+=_\-.]{16,}$")
 
+FIXTURE_PATH_RE = re.compile(
+    r"(?i)(/fixtures?/|/testdata/|/__tests__/|/tests?/|/examples?/|"
+    r"fixture/react|/sample|/mock[s]?/|/demo/)"
+)
+
 EXAMPLE_PATH_RE = re.compile(
-    r"(?i)(\.env\.example|\.env\.sample|\.env\.template|\.env\.dist|"
-    r"example\.env|config\.example|credentials\.example|/examples?/|"
-    r"workshop|demo-store|hydrogen-demo|tutorial|getting-started|"
-    r"sample-app|starter-template)"
+    r"(?i)("
+    r"\.env\.example|"
+    r"\.env\.[\w.-]*\.example|"
+    r"\.env\.sample|"
+    r"\.env\.template|"
+    r"\.env\.dist|"
+    r"\.env-sample|"
+    r"\.env\.mock|"
+    r"\.env copy|"
+    r"example\.env|"
+    r"config\.example|"
+    r"credentials\.example|"
+    r"/examples?/|"
+    r"workshop|demo-store|hydrogen-demo|tutorial|"
+    r"getting-started|sample-app|starter-template"
+    r")"
 )
 
 SENSITIVE_NAME_RE = re.compile(
@@ -138,6 +155,8 @@ def evidence_basis(
         SENSITIVE_NAME_RE.search(url or "")
     )
     is_example = bool(EXAMPLE_PATH_RE.search(url or ""))
+    is_fixture = bool(FIXTURE_PATH_RE.search(url or ""))
+    is_example = is_example or is_fixture
     is_historical = (discovery_mode or "").upper() in {"HISTORICAL", "PASSIVE_INDEX"} or (
         "HISTORICAL" in (classification or "").upper()
     )
@@ -227,6 +246,9 @@ def review_candidate(
     else:
         decision = "NEEDS_REVIEW"
         rationale_parts.append("Mixed or incomplete signals; human scope/context review recommended.")
+        if classification == "UNKNOWN" and not secret_like_keys and not basis.get("path_sensitive_name"):
+            decision = "LOW_PRIORITY"
+            rationale_parts.append("Generic UNKNOWN without sensitive path/content — deprioritized.")
 
     if target_relationship in {"INDEX_ONLY", "UNATTRIBUTED"}:
         rationale_parts.append(
@@ -234,6 +256,18 @@ def review_candidate(
         )
         if decision == "POTENTIAL_EXPOSURE_UNCONFIRMED":
             decision = "NEEDS_REVIEW"
+        # Generic public-index pages without sensitive path/content are not bounty leads
+        if classification in {
+            "UNKNOWN",
+            "IMPACT_UNPROVEN",
+            "INTENTIONALLY_PUBLIC",
+            "AUTH_REQUIRED",
+        } and not secret_like_keys:
+            if not basis.get("path_sensitive_name"):
+                decision = "LOW_PRIORITY"
+                rationale_parts.append(
+                    "Index-only generic page without sensitive path/content — deprioritized."
+                )
 
     return {
         "review_decision": decision,

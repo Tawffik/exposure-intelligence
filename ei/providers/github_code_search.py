@@ -16,6 +16,7 @@ PASSIVE_INDEX leads, not confirmed findings.
 from __future__ import annotations
 
 import json
+import time
 import os
 import urllib.error
 import urllib.parse
@@ -25,6 +26,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ei.models import DiscoveryMode, RunStatus, SourceFidelity, utc_now_iso
+from ei.providers.base import ProviderCollectResult
 from ei.query_families import select_query_terms, org_matches_target
 
 
@@ -32,20 +34,6 @@ PROVIDER_NAME = "github_code_search"
 CHECK_FAMILY = "public_code_index"
 DEFAULT_API = "https://api.github.com/search/code"
 USER_AGENT = "ExposureIntelligence/0.1.1 (passive-research; +https://github.com/Tawffik/exposure-intelligence)"
-
-
-@dataclass
-class ProviderCollectResult:
-    """Outcome of a single provider collect call."""
-
-    status: str
-    records: list[dict[str, Any]] = field(default_factory=list)
-    error_summary: str = ""
-    coverage_notes: str = ""
-    raw_total_count: Optional[int] = None
-    incomplete_results: bool = False
-    query: str = ""
-    provider: str = PROVIDER_NAME
 
 
 
@@ -485,6 +473,13 @@ class GitHubCodeSearchProvider:
                     error_summary=f"HTTP 403 rate limited: {err_body[:200]}",
                     query=query,
                 )
+            if e.code == 429:
+                # Secondary rate limit — stop multi-query early as RATE_LIMITED
+                return ProviderCollectResult(
+                    status=RunStatus.RATE_LIMITED.value,
+                    error_summary=f"HTTP 429: {err_body[:200]}",
+                    query=query,
+                )
             if e.code in (401, 403):
                 return ProviderCollectResult(
                     status=RunStatus.ERROR.value,
@@ -534,11 +529,19 @@ class GitHubCodeSearchProvider:
         notes: list[str] = []
         last_status = RunStatus.COMPLETED_ZERO.value
         errors: list[str] = []
+        n_q = max(len(queries), 1)
+        # Reserve slots across queries so org: does not monopolize max_total
+        per_query_cap = max(2, min(per_page, max(2, max_total // min(n_q, 4))))
         for q in queries:
             if len(merged) >= max_total:
                 break
             remaining = max_total - len(merged)
-            r = self.collect_live(q, per_page=min(per_page, remaining), target_host=target_host)
+            # Soft preference: leave room for later host-scoped families
+            take = min(per_page, remaining, per_query_cap)
+            if q.startswith("org:") and remaining > per_query_cap:
+                take = min(take, 3)
+            r = self.collect_live(q, per_page=take, target_host=target_host)
+            time.sleep(2.0)  # soft pacing against secondary rate limits
             notes.append(f"{q!r}->{r.status}/{len(r.records)}")
             if r.status == RunStatus.NOT_CONFIGURED.value:
                 return r
@@ -584,12 +587,30 @@ class GitHubCodeSearchProvider:
                 coverage_notes="; ".join(notes),
                 query="; ".join(queries),
             )
-        status = last_status if last_status != RunStatus.COMPLETED_ZERO.value else RunStatus.COMPLETED_WITH_RESULTS.value
+        # Preserve successful records even if later queries failed.
+        # ERROR with any records must surface as PARTIAL, never drop evidence.
+        if errors:
+            status = RunStatus.PARTIAL.value
+            err = "; ".join(errors)[:500]
+            coverage = (
+                "; ".join(notes)
+                + f"; merged={len(merged)}; query_errors={len(errors)}"
+            )
+        elif last_status == RunStatus.PARTIAL.value:
+            status = RunStatus.PARTIAL.value
+            err = ""
+            coverage = "; ".join(notes) + f"; merged={len(merged)}"
+        else:
+            status = RunStatus.COMPLETED_WITH_RESULTS.value
+            err = ""
+            coverage = "; ".join(notes) + f"; merged={len(merged)}"
         return ProviderCollectResult(
             status=status,
             records=merged[:max_total],
-            coverage_notes="; ".join(notes) + f"; merged={len(merged)}",
+            error_summary=err,
+            coverage_notes=coverage,
             query="; ".join(queries),
-            incomplete_results=len(merged) >= max_total,
+            incomplete_results=bool(errors) or len(merged) >= max_total,
+            actual_queries=list(queries),
         )
 

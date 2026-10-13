@@ -110,8 +110,9 @@ def test_waf_page():
         content_type="text/html",
         body="Attention Required! | Cloudflare",
     )
-    # 403 takes precedence as AUTH_REQUIRED in current logic
-    assert c in (Classification.AUTH_REQUIRED.value, Classification.GENERIC_ERROR.value)
+    # 403+WAF body -> GENERIC_ERROR; empty 403 may still be AUTH_REQUIRED
+    assert c == Classification.GENERIC_ERROR.value
+    assert "waf_or_block_page" in reasons
 
 
 def test_public_html():
@@ -207,3 +208,43 @@ def test_benign_json_still_unclassified():
     assert "json_response_unclassified" in reasons
     assert "source_map_structure" not in reasons
     assert "openapi_or_swagger_schema" not in reasons
+
+def test_403_cloudflare_is_not_auth_required():
+    """403 + Cloudflare block page must not be labeled pure AUTH_REQUIRED."""
+    from ei.classifier import classify_observation
+    cls, reasons, conf, rat, sens, fr = classify_observation(
+        url="https://example.com/admin",
+        status=403,
+        content_type="text/html",
+        body="<html><title>Attention Required! | Cloudflare</title><p>Ray ID</p></html>",
+        discovery_mode="FIXTURE",
+    )
+    assert cls == "GENERIC_ERROR"
+    assert "waf_or_block_page" in reasons
+    assert "http_auth_status" not in reasons or "waf_or_block_page" in reasons
+
+
+def test_401_with_login_form_is_auth_required():
+    from ei.classifier import classify_observation
+    cls, reasons, conf, rat, sens, fr = classify_observation(
+        url="https://example.com/login",
+        status=401,
+        content_type="text/html",
+        body='<form action="/signin"><input name="password" type="password"></form>',
+        discovery_mode="FIXTURE",
+    )
+    assert cls == "AUTH_REQUIRED"
+    assert "login_form_markers" in reasons
+
+
+def test_403_empty_body_auth_status_only():
+    from ei.classifier import classify_observation
+    cls, reasons, conf, rat, sens, fr = classify_observation(
+        url="https://example.com/secret",
+        status=403,
+        content_type="text/plain",
+        body="",
+        discovery_mode="FIXTURE",
+    )
+    assert cls == "AUTH_REQUIRED"
+    assert "empty_body" in reasons

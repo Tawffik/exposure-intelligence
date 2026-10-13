@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ei.models import DiscoveryMode, RunStatus, SourceFidelity, utc_now_iso
+from ei.host_relationship import classify_url_host_relationship, to_provider_relationship
 from ei.providers.base import ProviderCollectResult
 
 PROVIDER_NAME = "urlscan"
@@ -36,6 +37,19 @@ def build_urlscan_query(target_host: str) -> str:
     if not host or "." not in host:
         raise ValueError("target_host must be a multi-label domain")
     return f"domain:{host}"
+
+
+def build_urlscan_query_variants(target_host: str) -> list[str]:
+    """High-signal public-scan queries (search only; no new scan submission)."""
+    base = build_urlscan_query(target_host)
+    # URLScan search supports filename: and page.url: on indexed scans
+    return [
+        base,
+        f'{base} AND filename:.env',
+        f'{base} AND filename:config',
+        f'{base} AND page.url:".git"',
+        f'{base} AND page.url:backup',
+    ]
 
 
 def normalize_urlscan_item(
@@ -69,22 +83,15 @@ def normalize_urlscan_item(
     title = page.get("title") or ""
     tls = page.get("tlsIssuer") or page.get("tlsValidDays") or ""
 
-    # Relationship: URLScan domain match is index evidence only
-    host = (target_host or "").strip().lower().rstrip(".")
-    relationship = "INDEX_ONLY"
-    rationale = "Public URLScan index record; not current-state verification."
-    if host and domain and host == domain.lower().rstrip("."):
-        relationship = "RELATED_CANDIDATE"
-        rationale = (
-            f"URLScan page.domain equals selected host '{host}'. "
-            "Index-only; age and reachability unverified."
-        )
-    elif host and host in (url or "").lower():
-        relationship = "RELATED_CANDIDATE"
-        rationale = (
-            f"Selected host '{host}' appears in scanned URL. "
-            "Index-only; not a verified exposure."
-        )
+    # Relationship: DNS-boundary hostname only (not path/query substring)
+    rel_detail = classify_url_host_relationship(
+        target_host=target_host, url=url or "", provider_domain=domain or ""
+    )
+    relationship = to_provider_relationship(rel_detail)
+    rationale = (
+        "Public URLScan index record; not current-state verification. "
+        + (rel_detail.get("rationale") or "")
+    )
 
     preview = f"title={title[:80]} server={server} status={status_code}"
     meta = {
@@ -109,24 +116,38 @@ def normalize_urlscan_item(
         "selected_target_host": target_host,
         "target_relationship": relationship,
         "target_relationship_rationale": rationale,
-        "textual_match": bool(host and (host in (url or "").lower() or host == (domain or "").lower())),
-        "textual_match_fields": ["url", "domain"] if host else [],
+        "host_relationship_detail": rel_detail.get("relationship"),
+        "parsed_hostname": rel_detail.get("hostname") or "",
+        "provider_domain_conflict": bool(rel_detail.get("provider_domain_conflict")),
+        "provider_domain_fallback": bool(rel_detail.get("provider_domain_fallback")),
+        "textual_match": bool(rel_detail.get("textual_match")),
+        "textual_match_fields": list(rel_detail.get("textual_match_fields") or []),
         "source_artifact_url": result_api or url,
     }
+    # status/body aliases required by build_observation_from_fixture / classifier
+    # (http_status + body_preview_redacted alone were classified as EMPTY_RESPONSE)
+    st = int(status_code) if isinstance(status_code, int) else (
+        int(status_code) if str(status_code).isdigit() else None
+    )
+    body_text = preview[:500] if preview else (
+        f"[urlscan summary] domain={domain} title={title[:120]} server={server}"
+    )
     return {
         "url": url or result_api or f"urlscan://{scan_id}",
         "observed_at": observed,
         "discovery_mode": DiscoveryMode.PASSIVE_INDEX.value,
         "source_fidelity": SourceFidelity.SUMMARY.value,
-        "http_status": int(status_code) if isinstance(status_code, int) else None,
-        "content_type": "",
-        "body_preview_redacted": preview[:500],
+        "status": st,
+        "http_status": st,
+        "content_type": "text/plain",
+        "body": body_text,
+        "body_preview_redacted": body_text,
         "body_truncated": True,
         "provider": PROVIDER_NAME,
         "check_family": CHECK_FAMILY,
         "scope_decision": "PUBLIC_INDEX",
         "metadata": meta,
-        "labels": ["urlscan", "passive_index"],
+        "labels": ["urlscan", "passive_index", "index_summary_only"],
     }
 
 
@@ -159,6 +180,44 @@ class URLScanProvider:
             os.environ.get("URLSCAN_API_KEY") or os.environ.get("URLSCAN_KEY") or ""
         )
         self.timeout = timeout
+
+
+    def collect_live_query(self, query: str, *, size: int = 5) -> ProviderCollectResult:
+        """Run an arbitrary URLScan search query (passive index only)."""
+        size = max(1, min(int(size), 50))
+        q = (query or "").strip()
+        if not q:
+            return ProviderCollectResult(
+                status=RunStatus.ERROR.value,
+                error_summary="empty query",
+                provider=PROVIDER_NAME,
+            )
+        params = urllib.parse.urlencode({"q": q, "size": str(size)})
+        url = f"{self.api_url}?{params}"
+        headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+        if self.api_key:
+            headers["API-Key"] = self.api_key
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                body = resp.read()
+        except Exception as e:  # noqa: BLE001
+            return ProviderCollectResult(
+                status=RunStatus.ERROR.value,
+                error_summary=f"{type(e).__name__}: {e}"[:300],
+                query=q,
+                provider=PROVIDER_NAME,
+            )
+        try:
+            payload = json.loads(body.decode("utf-8", errors="replace"))
+        except Exception as e:  # noqa: BLE001
+            return ProviderCollectResult(
+                status=RunStatus.ERROR.value,
+                error_summary=f"json: {e}",
+                query=q,
+                provider=PROVIDER_NAME,
+            )
+        return normalize_urlscan_search_response(payload, query=q)
 
     def collect_from_fixture(
         self,
@@ -252,7 +311,7 @@ class URLScanProvider:
                 provider=PROVIDER_NAME,
                 actual_queries=[query],
             )
-        except urllib.error.URLError as e:
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
             return ProviderCollectResult(
                 status=RunStatus.ERROR.value,
                 error_summary=f"Network error: {e}",

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Iterable
 
+from ei.disclosure_taxonomy import classify_disclosure_signal
 from ei.models import (
     Candidate,
     Classification,
@@ -68,6 +69,32 @@ def observations_to_candidates(observations: Iterable[Observation]) -> list[Cand
             is_dup = True
 
         rank, explanation = score_candidate(primary, group)
+        disc = classify_disclosure_signal(
+            url=primary.discovered_url or "",
+            body=getattr(primary, "body_preview_redacted", "") or "",
+            labels=list(getattr(primary, "labels", None) or []),
+        )
+        url_l = (primary.discovered_url or "").lower()
+        if url_l.rstrip("/").endswith(".env") or "/.env." in url_l:
+            if ".example" not in url_l and ".sample" not in url_l:
+                rank = min(1.0, rank + 0.12)
+                explanation = list(explanation) + ["env_filename_boost"]
+        md = primary.metadata if isinstance(getattr(primary, "metadata", None), dict) else {}
+        if md.get("org_brand_match"):
+            rank = min(1.0, rank + 0.15)
+            explanation = list(explanation) + ["org_brand_rank_boost"]
+        # Boost official GitHub org paths matching target brand (e.g. /Shopify/)
+        brand = (primary.target_id or "").split("-")[0]
+        url_path = primary.discovered_url or ""
+        if brand and len(brand) >= 3 and f"/{brand}/" in url_path.replace("https://github.com/", "/"):
+            rank = min(1.0, rank + 0.1)
+            explanation = list(explanation) + ["github_org_path_boost"]
+        if disc.get("disclosure_class") and disc["disclosure_class"] != "GENERIC_PUBLIC":
+            explanation = list(explanation) + [
+                f"disclosure_class={disc['disclosure_class']}",
+                disc.get("label") or "",
+            ]
+
         cand = Candidate(
             stable_key=key,
             target_id=primary.target_id,
@@ -87,6 +114,13 @@ def observations_to_candidates(observations: Iterable[Observation]) -> list[Cand
             source_fidelity=primary.source_fidelity,
             evidence_summary=_evidence_summary(primary, group),
             classification_reason_codes=list(primary.classification_reason_codes or []),
+            target_relationship=(
+                (primary.metadata or {}).get("target_relationship")
+                or ((primary.metadata or {}).get("metadata") or {}).get("target_relationship")
+                or ""
+            ),
+            scope_decision=primary.scope_decision or "",
+            discovery_mode=primary.discovery_mode or "",
         )
         if is_dup:
             cand.rank_score = 0.0

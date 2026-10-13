@@ -23,7 +23,16 @@ def compute_run_metrics(result: dict[str, Any]) -> dict[str, Any]:
         1
         for q in queue
         if q.get("review_decision") in ("POTENTIAL_EXPOSURE_UNCONFIRMED", "NEEDS_REVIEW")
-        and q.get("classification") not in ("HISTORICAL_ONLY", "EMPTY_RESPONSE", "SPA_SHELL", "GENERIC_ERROR")
+        and q.get("classification")
+        not in (
+            "HISTORICAL_ONLY",
+            "EMPTY_RESPONSE",
+            "SPA_SHELL",
+            "GENERIC_ERROR",
+            "UNKNOWN",  # generic index pages need stronger signals
+            "AUTH_REQUIRED",
+            "UNREACHABLE",
+        )
     )
     noise = sum(
         1

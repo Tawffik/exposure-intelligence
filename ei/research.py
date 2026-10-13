@@ -23,6 +23,7 @@ from ei.pipeline import load_fixture_file, run_pipeline
 from ei.profile import ProgramProfile, assess_relevance, live_request_permitted, validate_profile
 from ei.providers.base import ProviderCollectResult
 from ei.providers.cdx import CDXProvider
+from ei.query_families import select_query_terms
 from ei.providers.github_code_search import (
     GitHubCodeSearchProvider,
     build_target_scoped_query_variants,
@@ -69,10 +70,13 @@ def compare_runs(
     current: RunReport,
     previous_keys: set[str],
     previous_url_keys: set[str],
+    *,
+    baseline_available: bool = True,
 ) -> list[dict[str, Any]]:
     """
     Tag each current candidate with change_type relative to previous run keys.
-    Absence from current is handled by caller (not_observed list).
+    When baseline_available is False (no prior compatible run), use FIRST_SEEN
+    instead of NEW — first observation is not proven novelty vs a prior success.
     """
     queue: list[dict[str, Any]] = []
     for c in current.candidates:
@@ -81,6 +85,8 @@ def compare_runs(
             change = "REPEATED"
             if c.classification in ("HISTORICAL_ONLY",):
                 change = "HISTORICAL_ONLY"
+        elif not baseline_available:
+            change = "FIRST_SEEN"
         else:
             change = "NEW"
         next_step = _suggest_next_step(c)
@@ -102,6 +108,9 @@ def compare_runs(
             "classification_reason_codes": list(
                 getattr(c, "classification_reason_codes", None) or []
             ),
+            "target_relationship": getattr(c, "target_relationship", "") or "",
+            "scope_decision": getattr(c, "scope_decision", "") or "",
+            "discovery_mode": getattr(c, "discovery_mode", "") or "",
         }
         # Prefer reason codes from primary observation via evidence_summary parse fallback
         queue.append(review_queue_item(item))
@@ -229,7 +238,22 @@ def run_research(
         else:
             host_for_q = target_host or (profile.in_scope_hosts[0] if profile.in_scope_hosts else "")
             if host_for_q:
-                variants = build_target_scoped_query_variants(host_for_q, github_live_query or "", limit=8)
+                gq = github_live_query or ""
+                if gq.lower().startswith("family:") or not gq.strip():
+                    fam = gq.split(":", 1)[1].strip() if ":" in gq else "all"
+                    terms = select_query_terms(family=fam or "all", limit=max(1, min(int(max_results), 6)))
+                    variants = [f"{host_for_q} {term}" for term in terms]
+                    # Prefer org-scoped env (high attribution) but keep host-scoped slots
+                    brand = host_for_q.split(".")[0]
+                    if brand and brand.isalpha() and len(brand) >= 3:
+                        org_q = [
+                            f"org:{brand} filename:.env",
+                            f"org:{brand} filename:.env.production",
+                        ]
+                        variants = org_q + variants
+                        variants = variants[: max(6, min(int(max_results), 8))]
+                else:
+                    variants = build_target_scoped_query_variants(host_for_q, gq, limit=8)
                 gh_result = gh.collect_live_multi(
                     variants,
                     per_page=max(1, min(int(max_results), 40)),
@@ -304,7 +328,31 @@ def run_research(
                 provider="urlscan",
             )
         else:
-            us_result = URLScanProvider().collect_live(host_for_q, size=max_results)
+            try:
+                us_result = URLScanProvider().collect_live(host_for_q, size=max_results)
+                # Supplemental high-signal search (existing public scans only)
+                try:
+                    us2 = URLScanProvider().collect_live_query(
+                        f"domain:{host_for_q} AND filename:.env",
+                        size=min(5, int(max_results)),
+                    )
+                    if us2.records:
+                        seen = {r.get("url") for r in us_result.records}
+                        for rec in us2.records:
+                            if rec.get("url") not in seen:
+                                us_result.records.append(rec)
+                        us_result.coverage_notes = (
+                            (us_result.coverage_notes or "")
+                            + f" +filename:.env supplemental={len(us2.records)}"
+                        )
+                except Exception:
+                    pass
+            except Exception as e:  # noqa: BLE001 — provider must not crash research
+                us_result = ProviderCollectResult(
+                    status=RunStatus.ERROR.value,
+                    error_summary=f"urlscan unhandled: {type(e).__name__}: {e}"[:400],
+                    provider="urlscan",
+                )
     _merge_provider(us_result, "urlscan")
 
     # --- Internet Archive CDX historical provider ---
@@ -327,7 +375,14 @@ def run_research(
                 provider="internet_archive_cdx",
             )
         else:
-            cdx_result = CDXProvider().collect_live(host_for_q, limit=max_results)
+            try:
+                cdx_result = CDXProvider().collect_live(host_for_q, limit=max_results)
+            except Exception as e:  # noqa: BLE001
+                cdx_result = ProviderCollectResult(
+                    status=RunStatus.ERROR.value,
+                    error_summary=f"cdx unhandled: {type(e).__name__}: {e}"[:400],
+                    provider="internet_archive_cdx",
+                )
     _merge_provider(cdx_result, "internet_archive_cdx")
 
     # --- Bounded current-state probes (fail-closed; ACTIVE only) ---
@@ -355,8 +410,24 @@ def run_research(
     report.started_at = started
     report.ended_at = utc_now_iso()
     report.provider_summaries = provider_summaries
-    # Overall status: prefer worst non-success provider if no observations
-    if not report.observations:
+    # Overall status must reflect provider coverage honesty (charter §6).
+    # Success from one provider must not hide ERROR/PARTIAL from another required source.
+    _fail = {RunStatus.ERROR.value, RunStatus.RATE_LIMITED.value}
+    _partial_markers = {RunStatus.PARTIAL.value, RunStatus.NOT_CONFIGURED.value}
+    has_obs = bool(report.observations)
+    any_fail = any(ps.status in _fail for ps in provider_summaries)
+    any_partial = any(ps.status in _partial_markers for ps in provider_summaries)
+    any_results = any(
+        ps.status in (RunStatus.COMPLETED_WITH_RESULTS.value, RunStatus.PARTIAL.value)
+        and (ps.records_normalized or 0) > 0
+        for ps in provider_summaries
+    )
+    if has_obs or any_results:
+        if any_fail or any_partial:
+            report.status = RunStatus.PARTIAL.value
+        else:
+            report.status = RunStatus.COMPLETED_WITH_RESULTS.value
+    else:
         for ps in provider_summaries:
             if ps.status in (
                 RunStatus.ERROR.value,
@@ -388,7 +459,7 @@ def run_research(
         prev_keys |= {k for k in store.candidate_keys_for_run(prev_id) if not k.startswith("url:")}
         prev_urls = {k for k in store.candidate_keys_for_run(prev_id) if k.startswith("url:")}
 
-    queue = compare_runs(report, prev_keys, prev_urls)
+    queue = compare_runs(report, prev_keys, prev_urls, baseline_available=bool(prev_id))
 
     # not observed in this run but present previously (compatible mode only)
     not_observed: list[dict[str, Any]] = []
@@ -419,6 +490,7 @@ def run_research(
     )
 
     new_count = sum(1 for q in queue if q["change_type"] == "NEW")
+    first_seen = sum(1 for q in queue if q["change_type"] == "FIRST_SEEN")
     repeated = sum(1 for q in queue if q["change_type"] == "REPEATED")
 
     return {
@@ -440,6 +512,8 @@ def run_research(
         "summary": {
             "candidates": len(queue),
             "new": new_count,
+            "first_seen": first_seen,
+            "baseline_available": bool(prev_id),
             "repeated": repeated,
             "not_in_latest_run": len(not_observed),
             "potentially_sensitive": report.metrics.get("potentially_sensitive", 0),

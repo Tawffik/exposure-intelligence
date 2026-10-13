@@ -1,0 +1,24 @@
+{
+  "schema": "ei.capability_matrix.v1",
+  "updated_at": "2026-10-13T23:10:56Z",
+  "families": {
+    "secrets_in_public_artifacts": "benchmarked",
+    "env_config_files": "benchmarked",
+    "backups_archives": "tested_fixtures",
+    "source_maps": "benchmarked",
+    "openapi_schemas": "benchmarked",
+    "directory_listings": "benchmarked",
+    "git_metadata": "benchmarked",
+    "spa_shell_noise": "benchmarked",
+    "auth_pages_noise": "benchmarked",
+    "historical_cdx": "tested_fixtures",
+    "urlscan_public_index": "tested_fixtures",
+    "github_code_search": "tested_fixtures",
+    "host_attribution": "benchmarked",
+    "example_template_demotion": "benchmarked",
+    "BOLA_IDOR": "deferred_lab_only",
+    "authenticated_overexposure": "deferred_requires_ACTIVE",
+    "graphql_authz": "deferred",
+    "cache_cdn_isolation": "deferred_lab_only"
+  }
+}

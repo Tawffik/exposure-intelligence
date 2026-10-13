@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ei.models import DiscoveryMode, RunStatus, SourceFidelity, utc_now_iso
+from ei.host_relationship import classify_url_host_relationship, to_provider_relationship
 from ei.providers.base import ProviderCollectResult
 
 PROVIDER_NAME = "internet_archive_cdx"
@@ -27,16 +28,35 @@ CHECK_FAMILY = "historical_url_index"
 DEFAULT_API = "https://web.archive.org/cdx/search/cdx"
 USER_AGENT = "ExposureIntelligence/0.2.0 (passive-research; +https://github.com/Tawffik/exposure-intelligence)"
 
+
 def _is_junk_url(url: str) -> bool:
     """Drop clearly malformed/noisy archive originals."""
     u = url or ""
     if not u.startswith(("http://", "https://")):
         return True
-    bad_tokens = ("%0a", "%0d", "%22", "%27", "!!!!!", "!==", "/%22", "\n")
+    bad_tokens = (
+        "%0a",
+        "%0d",
+        "%22",
+        "%27",
+        "!!!!!",
+        "!==",
+        "/%22",
+        "${",
+        "$ci_",
+        "prgnam",
+        "committish",
+        "downloadedversion",
+        "wallhack",
+        "aimbot",
+        "fortnitespoofer",
+        "cheat-undetected",
+    )
     low = u.lower()
     if any(b in low for b in bad_tokens):
         return True
-    # Bare host with only port and slash is low value
+    if "\n" in u or "\r" in u:
+        return True
     from urllib.parse import urlparse
     try:
         path = urlparse(u).path or ""
@@ -47,6 +67,7 @@ def _is_junk_url(url: str) -> bool:
     if len(path) <= 1 and ":" in (urlparse(u).netloc or ""):
         return True
     return False
+
 
 DEFAULT_FL = "timestamp,original,statuscode,mimetype,digest,length"
 
@@ -89,35 +110,36 @@ def normalize_cdx_row(
     if ts and original:
         wayback = f"https://web.archive.org/web/{ts}/{original}"
 
-    host = (target_host or "").strip().lower().rstrip(".")
-    relationship = "INDEX_ONLY"
-    rationale = "Historical CDX index row; not proof of current exposure."
-    if host and host in (original or "").lower():
-        relationship = "RELATED_CANDIDATE"
-        rationale = (
-            f"CDX original URL references selected host '{host}'. "
-            "Historical only; current reachability unknown."
-        )
+    rel_detail = classify_url_host_relationship(
+        target_host=target_host, url=original or "", provider_domain=""
+    )
+    relationship = to_provider_relationship(rel_detail)
+    rationale = (
+        "Historical CDX index row; not proof of current exposure. "
+        + (rel_detail.get("rationale") or "")
+    )
 
     # Sensitive-looking path heuristics (filename only — never treat as confirmed)
     path_lower = (original or "").lower()
     labels = ["cdx", "historical"]
     sens_hint = False
     for token in (
-        ".env",
-        "backup",
-        ".sql",
-        ".zip",
-        ".tar",
-        ".bak",
-        "config",
-        "secret",
-        "dump",
-        ".map",
-        "phpinfo",
-        "trace.axd",
+        "/.env",
+        ".env.",
+        ".env/",
+        "backup.zip",
+        "backup.sql",
+        "dump.sql",
+        "database.sql",
         ".git/",
         "wp-config",
+        "web.config",
+        "appsettings.json",
+        "id_rsa",
+        "phpinfo.php",
+        "trace.axd",
+        ".pem",
+        ".map",
     ):
         if token in path_lower:
             labels.append("path_sensitive_hint")
@@ -136,8 +158,12 @@ def normalize_cdx_row(
         "selected_target_host": target_host,
         "target_relationship": relationship,
         "target_relationship_rationale": rationale,
-        "textual_match": bool(host and host in (original or "").lower()),
-        "textual_match_fields": ["original"] if host and host in (original or "").lower() else [],
+        "host_relationship_detail": rel_detail.get("relationship"),
+        "parsed_hostname": rel_detail.get("hostname") or "",
+        "provider_domain_conflict": bool(rel_detail.get("provider_domain_conflict")),
+        "provider_domain_fallback": bool(rel_detail.get("provider_domain_fallback")),
+        "textual_match": bool(rel_detail.get("textual_match")),
+        "textual_match_fields": list(rel_detail.get("textual_match_fields") or []),
         "path_sensitive_hint": sens_hint,
         "source_artifact_url": wayback or original,
         "freshness": "HISTORICAL",
@@ -221,7 +247,7 @@ class CDXProvider:
         self,
         *,
         api_url: str = DEFAULT_API,
-        timeout: float = 30.0,
+        timeout: float = 12.0,
     ) -> None:
         self.api_url = api_url
         self.timeout = timeout
@@ -300,7 +326,7 @@ class CDXProvider:
         # CDX supports multiple filter params via repeated keys — use urllib list later if needed.
         # Single regex filter on original path:
         if not filter_statuscode:
-            params["filter"] = r"original:.*(\.(env|sql|zip|map|bak|tar|gz|pem)|backup|config|\.git|secret|dump|credentials)"
+            params["filter"] = r"original:.*(\.env|backup\.|dump\.sql|wp-config|\.git/|\.map|openapi|swagger)"
         qs = urllib.parse.urlencode(params)
         url = f"{self.api_url}?{qs}"
         headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
@@ -329,7 +355,7 @@ class CDXProvider:
                 provider=PROVIDER_NAME,
                 actual_queries=[url],
             )
-        except urllib.error.URLError as e:
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
             return ProviderCollectResult(
                 status=RunStatus.ERROR.value,
                 error_summary=f"Network error: {e}",

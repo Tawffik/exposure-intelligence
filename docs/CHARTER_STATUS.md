@@ -29,3 +29,20 @@ Mapped against *Exposure Intelligence — Independent Project Charter & Engineer
 Estimated P0-P1 slice: **~95%**.
 
 Non-goals respected: no vuln oracle, no secret storage, no CAPTCHA evasion, no exploitation.
+
+
+## Attribution note (2026-10-13)
+URLScan/CDX previously used substring `host in url`. Fixed to shared DNS-boundary helper (`ei/host_relationship.py`). Textual matches remain metadata only.
+
+## v0.5.0 restructure (2026-10-14)
+
+Merged P0 attribution (#9) + Superdrug data-path (#10) into feature branch.
+Expanded disclosure surface coverage:
+
+- Query families: env/config, secrets/maps, backups, **api_specs (OpenAPI/Swagger)**, **vcs_meta**, diagnostics
+- Artifact path catalog v2 (authorized probes only)
+- `ei/disclosure_taxonomy.py` — class labels for ranking rationale
+- `docs/ID_RESEARCH_METHOD.md` — research method bound to Notion ID scenarios
+- Honesty: PARTIAL retention, FIRST_SEEN, DNS-boundary host authority
+
+Still non-goals: vuln oracle, secret storage, CAPTCHA evasion, full BugBountyCI recon merge.

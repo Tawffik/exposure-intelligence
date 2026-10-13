@@ -27,6 +27,11 @@ WAF_MARKERS = [
     re.compile(r"Access Denied", re.I),
     re.compile(r"Request blocked", re.I),
     re.compile(r"aws_waf", re.I),
+    re.compile(r"cf-error-details", re.I),
+    re.compile(r"cloudflare ray id", re.I),
+    re.compile(r"the requested URL was rejected", re.I),
+    re.compile(r"Akamai|Reference\s*#", re.I),
+    re.compile(r"blocked by.*security policy", re.I),
 ]
 LOGIN_MARKERS = [
     re.compile(r"<form[^>]+(login|signin|auth)", re.I),
@@ -45,7 +50,7 @@ ARCHIVE_SIGNATURES = [
     re.compile(r"ustar"),  # tar
 ]
 SENSITIVE_PATH_HINTS = re.compile(
-    r"(?i)(backup|dump|\.env|config\.ya?ml|\.git/|id_rsa|\.pem|credentials|secret|trace\.axd|web\.config)",
+    r"(?i)(backup|dump|\.env|config\.ya?ml|\.git/|id_rsa|\.pem|credentials|secret|trace\.axd|web\.config|service-account|appsettings|\.aws/|wp-config|phpinfo|swagger|openapi|\.map$)",
 )
 TRACE_MARKERS = [
     re.compile(r"Application Trace", re.I),
@@ -175,11 +180,41 @@ def classify_observation(
             reasons.append("mirror_source")
 
     if status is not None and status in (401, 403):
+        # Status alone does not prove *why* access was denied.
+        # Prefer body evidence: WAF/block pages vs login forms vs opaque deny.
+        if body.strip() and _matches_any(body, WAF_MARKERS):
+            return (
+                Classification.GENERIC_ERROR.value,
+                ["http_forbidden_status", "waf_or_block_page"],
+                0.85,
+                f"HTTP {status} with WAF/block-page fingerprints — access policy/edge block, "
+                "not proven application authentication challenge.",
+                SensitivityClass.NONE.value,
+                freshness,
+            )
+        if body.strip() and _matches_any(body, LOGIN_MARKERS):
+            return (
+                Classification.AUTH_REQUIRED.value,
+                ["http_auth_status", "login_form_markers"],
+                0.88,
+                f"HTTP {status} with login/sign-in form markers — authentication challenge likely.",
+                SensitivityClass.NONE.value,
+                freshness,
+            )
+        if not body.strip():
+            return (
+                Classification.AUTH_REQUIRED.value,
+                ["http_auth_status", "empty_body"],
+                0.7,
+                f"HTTP {status} with empty body — often auth or ACL deny; reason not confirmed from content.",
+                SensitivityClass.NONE.value,
+                freshness,
+            )
         return (
             Classification.AUTH_REQUIRED.value,
-            ["http_auth_status"],
-            0.85,
-            f"HTTP {status} indicates authentication or authorization is required.",
+            ["http_auth_status", "opaque_deny_body"],
+            0.75,
+            f"HTTP {status} with non-WAF body — treated as auth/ACL deny without stronger evidence.",
             SensitivityClass.NONE.value,
             freshness,
         )
@@ -371,8 +406,12 @@ def classify_observation(
         # Keyword path match alone is weak without content support
         is_example_path = bool(
             re.search(
-                r"(?i)(\.env\.example|\.env\.sample|\.env\.template|\.env\.dist|"
-                r"example\.env|/examples?/)",
+                r"(?i)("
+                r"\.env\.example|"
+                r"\.env\.[\w.-]*\.example|"
+                r"\.env\.sample|\.env\.template|\.env\.dist|"
+                r"\.env-sample|\.env\.mock|\.env copy|"
+                r"example\.env|/examples?/|workshop|demo-store|sample-app)",
                 url_l,
             )
         )
@@ -462,13 +501,13 @@ def classify_observation(
 
 def build_observation_from_fixture(record: dict, run_id: str = "", target_id: str = "") -> Observation:
     """Build a fully classified Observation from a fixture/raw record."""
-    body = record.get("body", "") or ""
+    body = record.get("body", "") or record.get("body_preview_redacted", "") or ""
     preview, redacted = redact_text(body)
     sha = content_hash(body) if body else ""
     is_dup = bool(record.get("is_duplicate", False))
     classification, reasons, conf, rationale, sens, fresh = classify_observation(
         url=record.get("url", ""),
-        status=record.get("status"),
+        status=record.get("status") if record.get("status") is not None else record.get("http_status"),
         content_type=record.get("content_type", ""),
         body=body,
         discovery_mode=record.get("discovery_mode", DiscoveryMode.FIXTURE.value),
@@ -485,7 +524,7 @@ def build_observation_from_fixture(record: dict, run_id: str = "", target_id: st
         discovered_url=record.get("url", ""),
         discovery_mode=record.get("discovery_mode", DiscoveryMode.FIXTURE.value),
         source_fidelity=record.get("source_fidelity", "ORIGINAL"),
-        http_status=record.get("status"),
+        http_status=record.get("status") if record.get("status") is not None else record.get("http_status"),
         content_type=record.get("content_type", ""),
         body_byte_count=len(body.encode("utf-8", errors="replace")),
         body_sha256=sha,
