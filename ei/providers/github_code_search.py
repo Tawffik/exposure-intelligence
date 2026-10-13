@@ -527,7 +527,7 @@ class GitHubCodeSearchProvider:
                 break
             remaining = max_total - len(merged)
             r = self.collect_live(q, per_page=min(per_page, remaining), target_host=target_host)
-            time.sleep(1.5)  # soft pacing against secondary rate limits
+            time.sleep(2.5)  # soft pacing against secondary rate limits
             notes.append(f"{q!r}->{r.status}/{len(r.records)}")
             if r.status == RunStatus.NOT_CONFIGURED.value:
                 return r

@@ -227,6 +227,9 @@ def review_candidate(
     else:
         decision = "NEEDS_REVIEW"
         rationale_parts.append("Mixed or incomplete signals; human scope/context review recommended.")
+        if classification == "UNKNOWN" and not secret_like_keys and not basis.get("path_sensitive_name"):
+            decision = "LOW_PRIORITY"
+            rationale_parts.append("Generic UNKNOWN without sensitive path/content — deprioritized.")
 
     if target_relationship in {"INDEX_ONLY", "UNATTRIBUTED"}:
         rationale_parts.append(
@@ -235,7 +238,12 @@ def review_candidate(
         if decision == "POTENTIAL_EXPOSURE_UNCONFIRMED":
             decision = "NEEDS_REVIEW"
         # Generic public-index pages without sensitive path/content are not bounty leads
-        if classification in {"UNKNOWN", "IMPACT_UNPROVEN", "INTENTIONALLY_PUBLIC"} and not secret_like_keys:
+        if classification in {
+            "UNKNOWN",
+            "IMPACT_UNPROVEN",
+            "INTENTIONALLY_PUBLIC",
+            "AUTH_REQUIRED",
+        } and not secret_like_keys:
             if not basis.get("path_sensitive_name"):
                 decision = "LOW_PRIORITY"
                 rationale_parts.append(

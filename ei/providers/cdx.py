@@ -28,16 +28,35 @@ CHECK_FAMILY = "historical_url_index"
 DEFAULT_API = "https://web.archive.org/cdx/search/cdx"
 USER_AGENT = "ExposureIntelligence/0.2.0 (passive-research; +https://github.com/Tawffik/exposure-intelligence)"
 
+
 def _is_junk_url(url: str) -> bool:
     """Drop clearly malformed/noisy archive originals."""
     u = url or ""
     if not u.startswith(("http://", "https://")):
         return True
-    bad_tokens = ("%0a", "%0d", "%22", "%27", "!!!!!", "!==", "/%22", "\n")
+    bad_tokens = (
+        "%0a",
+        "%0d",
+        "%22",
+        "%27",
+        "!!!!!",
+        "!==",
+        "/%22",
+        "${",
+        "$ci_",
+        "prgnam",
+        "committish",
+        "downloadedversion",
+        "wallhack",
+        "aimbot",
+        "fortnitespoofer",
+        "cheat-undetected",
+    )
     low = u.lower()
     if any(b in low for b in bad_tokens):
         return True
-    # Bare host with only port and slash is low value
+    if "\n" in u or "\r" in u:
+        return True
     from urllib.parse import urlparse
     try:
         path = urlparse(u).path or ""
@@ -48,6 +67,7 @@ def _is_junk_url(url: str) -> bool:
     if len(path) <= 1 and ":" in (urlparse(u).netloc or ""):
         return True
     return False
+
 
 DEFAULT_FL = "timestamp,original,statuscode,mimetype,digest,length"
 
