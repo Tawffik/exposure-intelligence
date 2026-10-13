@@ -180,6 +180,9 @@ class Candidate:
     source_fidelity: str = SourceFidelity.ORIGINAL.value
     evidence_summary: str = ""
     classification_reason_codes: list[str] = field(default_factory=list)
+    target_relationship: str = ""
+    scope_decision: str = ""
+    discovery_mode: str = ""
     created_at: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> dict[str, Any]:

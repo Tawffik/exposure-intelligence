@@ -69,10 +69,13 @@ def compare_runs(
     current: RunReport,
     previous_keys: set[str],
     previous_url_keys: set[str],
+    *,
+    baseline_available: bool = True,
 ) -> list[dict[str, Any]]:
     """
     Tag each current candidate with change_type relative to previous run keys.
-    Absence from current is handled by caller (not_observed list).
+    When baseline_available is False (no prior compatible run), use FIRST_SEEN
+    instead of NEW — first observation is not proven novelty vs a prior success.
     """
     queue: list[dict[str, Any]] = []
     for c in current.candidates:
@@ -81,6 +84,8 @@ def compare_runs(
             change = "REPEATED"
             if c.classification in ("HISTORICAL_ONLY",):
                 change = "HISTORICAL_ONLY"
+        elif not baseline_available:
+            change = "FIRST_SEEN"
         else:
             change = "NEW"
         next_step = _suggest_next_step(c)
@@ -102,6 +107,9 @@ def compare_runs(
             "classification_reason_codes": list(
                 getattr(c, "classification_reason_codes", None) or []
             ),
+            "target_relationship": getattr(c, "target_relationship", "") or "",
+            "scope_decision": getattr(c, "scope_decision", "") or "",
+            "discovery_mode": getattr(c, "discovery_mode", "") or "",
         }
         # Prefer reason codes from primary observation via evidence_summary parse fallback
         queue.append(review_queue_item(item))
@@ -355,8 +363,24 @@ def run_research(
     report.started_at = started
     report.ended_at = utc_now_iso()
     report.provider_summaries = provider_summaries
-    # Overall status: prefer worst non-success provider if no observations
-    if not report.observations:
+    # Overall status must reflect provider coverage honesty (charter §6).
+    # Success from one provider must not hide ERROR/PARTIAL from another required source.
+    _fail = {RunStatus.ERROR.value, RunStatus.RATE_LIMITED.value}
+    _partial_markers = {RunStatus.PARTIAL.value, RunStatus.NOT_CONFIGURED.value}
+    has_obs = bool(report.observations)
+    any_fail = any(ps.status in _fail for ps in provider_summaries)
+    any_partial = any(ps.status in _partial_markers for ps in provider_summaries)
+    any_results = any(
+        ps.status in (RunStatus.COMPLETED_WITH_RESULTS.value, RunStatus.PARTIAL.value)
+        and (ps.records_normalized or 0) > 0
+        for ps in provider_summaries
+    )
+    if has_obs or any_results:
+        if any_fail or any_partial:
+            report.status = RunStatus.PARTIAL.value
+        else:
+            report.status = RunStatus.COMPLETED_WITH_RESULTS.value
+    else:
         for ps in provider_summaries:
             if ps.status in (
                 RunStatus.ERROR.value,
@@ -388,7 +412,7 @@ def run_research(
         prev_keys |= {k for k in store.candidate_keys_for_run(prev_id) if not k.startswith("url:")}
         prev_urls = {k for k in store.candidate_keys_for_run(prev_id) if k.startswith("url:")}
 
-    queue = compare_runs(report, prev_keys, prev_urls)
+    queue = compare_runs(report, prev_keys, prev_urls, baseline_available=bool(prev_id))
 
     # not observed in this run but present previously (compatible mode only)
     not_observed: list[dict[str, Any]] = []
@@ -419,6 +443,7 @@ def run_research(
     )
 
     new_count = sum(1 for q in queue if q["change_type"] == "NEW")
+    first_seen = sum(1 for q in queue if q["change_type"] == "FIRST_SEEN")
     repeated = sum(1 for q in queue if q["change_type"] == "REPEATED")
 
     return {
@@ -440,6 +465,8 @@ def run_research(
         "summary": {
             "candidates": len(queue),
             "new": new_count,
+            "first_seen": first_seen,
+            "baseline_available": bool(prev_id),
             "repeated": repeated,
             "not_in_latest_run": len(not_observed),
             "potentially_sensitive": report.metrics.get("potentially_sensitive", 0),

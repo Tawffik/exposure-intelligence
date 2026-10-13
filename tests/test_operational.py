@@ -91,7 +91,9 @@ def test_research_persists_and_compares():
         assert r1["ok"]
         assert r1["summary"]["candidates"] >= 10
         assert r1["previous_run_id"] is None
-        assert r1["summary"]["new"] == r1["summary"]["candidates"]
+        assert r1["summary"].get("first_seen", 0) + r1["summary"].get("new", 0) == r1["summary"]["candidates"]
+        assert r1["summary"].get("baseline_available") is False
+        assert r1["summary"].get("first_seen", 0) == r1["summary"]["candidates"]
         assert r1["live_host_requests"] == 0
 
         r2 = run_research(

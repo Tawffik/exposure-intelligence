@@ -104,20 +104,22 @@ def normalize_cdx_row(
     labels = ["cdx", "historical"]
     sens_hint = False
     for token in (
-        ".env",
-        "backup",
-        ".sql",
-        ".zip",
-        ".tar",
-        ".bak",
-        "config",
-        "secret",
-        "dump",
-        ".map",
-        "phpinfo",
-        "trace.axd",
+        "/.env",
+        ".env.",
+        ".env/",
+        "backup.zip",
+        "backup.sql",
+        "dump.sql",
+        "database.sql",
         ".git/",
         "wp-config",
+        "web.config",
+        "appsettings.json",
+        "id_rsa",
+        "phpinfo.php",
+        "trace.axd",
+        ".pem",
+        ".map",
     ):
         if token in path_lower:
             labels.append("path_sensitive_hint")
@@ -304,7 +306,7 @@ class CDXProvider:
         # CDX supports multiple filter params via repeated keys — use urllib list later if needed.
         # Single regex filter on original path:
         if not filter_statuscode:
-            params["filter"] = r"original:.*(\.(env|sql|zip|map|bak|tar|gz|pem)|backup|config|\.git|secret|dump|credentials)"
+            params["filter"] = r"original:.*(/(\.env(\.|$)|\.git/|backup\.(zip|sql|tar|gz)|dump\.sql|database\.sql|wp-config\.php|web\.config|appsettings\.json|id_rsa|\.pem|trace\.axd|phpinfo\.php)|\.(env|sql|zip|map|bak|tar\.gz|pem)([?#]|$))"
         qs = urllib.parse.urlencode(params)
         url = f"{self.api_url}?{qs}"
         headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}

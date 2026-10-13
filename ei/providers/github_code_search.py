@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ei.models import DiscoveryMode, RunStatus, SourceFidelity, utc_now_iso
+from ei.providers.base import ProviderCollectResult
 from ei.query_families import select_query_terms, org_matches_target
 
 
@@ -32,20 +33,6 @@ PROVIDER_NAME = "github_code_search"
 CHECK_FAMILY = "public_code_index"
 DEFAULT_API = "https://api.github.com/search/code"
 USER_AGENT = "ExposureIntelligence/0.1.1 (passive-research; +https://github.com/Tawffik/exposure-intelligence)"
-
-
-@dataclass
-class ProviderCollectResult:
-    """Outcome of a single provider collect call."""
-
-    status: str
-    records: list[dict[str, Any]] = field(default_factory=list)
-    error_summary: str = ""
-    coverage_notes: str = ""
-    raw_total_count: Optional[int] = None
-    incomplete_results: bool = False
-    query: str = ""
-    provider: str = PROVIDER_NAME
 
 
 
@@ -584,12 +571,30 @@ class GitHubCodeSearchProvider:
                 coverage_notes="; ".join(notes),
                 query="; ".join(queries),
             )
-        status = last_status if last_status != RunStatus.COMPLETED_ZERO.value else RunStatus.COMPLETED_WITH_RESULTS.value
+        # Preserve successful records even if later queries failed.
+        # ERROR with any records must surface as PARTIAL, never drop evidence.
+        if errors:
+            status = RunStatus.PARTIAL.value
+            err = "; ".join(errors)[:500]
+            coverage = (
+                "; ".join(notes)
+                + f"; merged={len(merged)}; query_errors={len(errors)}"
+            )
+        elif last_status == RunStatus.PARTIAL.value:
+            status = RunStatus.PARTIAL.value
+            err = ""
+            coverage = "; ".join(notes) + f"; merged={len(merged)}"
+        else:
+            status = RunStatus.COMPLETED_WITH_RESULTS.value
+            err = ""
+            coverage = "; ".join(notes) + f"; merged={len(merged)}"
         return ProviderCollectResult(
             status=status,
             records=merged[:max_total],
-            coverage_notes="; ".join(notes) + f"; merged={len(merged)}",
+            error_summary=err,
+            coverage_notes=coverage,
             query="; ".join(queries),
-            incomplete_results=len(merged) >= max_total,
+            incomplete_results=bool(errors) or len(merged) >= max_total,
+            actual_queries=list(queries),
         )
 
