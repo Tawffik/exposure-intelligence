@@ -37,6 +37,24 @@ USER_AGENT = "ExposureIntelligence/0.1.1 (passive-research; +https://github.com/
 
 
 
+
+def append_hunter_noise_filters(query: str) -> str:
+    """Reduce classic false-positive buckets used by strong GitHub hunters.
+
+    Inspired by public GitHub-recon writeups (e.g. Orwa Atyat): exclude obvious
+    non-production hosts and consumer-mail noise from code search when possible.
+    Does not claim the remaining hits are in-scope or exploitable.
+    """
+    q = (query or "").strip()
+    if not q:
+        return q
+    # Keep filters short — GitHub rejects overly long queries
+    for token in ("NOT localhost", "NOT 127.0.0.1"):
+        if token.lower() not in q.lower():
+            q = f"{q} {token}"
+    return q
+
+
 def build_target_scoped_query(target_host: str, base_terms: str = "") -> str:
     """
     Build a GitHub code-search query that includes the target host.
@@ -68,7 +86,7 @@ def build_target_scoped_query(target_host: str, base_terms: str = "") -> str:
     base = base.strip()
     if base.startswith("(") and base.endswith(")"):
         base = base[1:-1].strip()
-    return f"{host} {base}"
+    return append_hunter_noise_filters(f"{host} {base}")
 
 
 def build_target_scoped_query_variants(target_host: str, base_terms: str = "", *, limit: int = 4) -> list[str]:
@@ -82,7 +100,7 @@ def build_target_scoped_query_variants(target_host: str, base_terms: str = "", *
     terms = select_query_terms(base_terms=raw, family="default", limit=max(1, limit))
     queries = []
     for term in terms:
-        queries.append(f"{host} {term}")
+        queries.append(append_hunter_noise_filters(f"{host} {term}"))
     return queries
 
 

@@ -5,6 +5,8 @@ Sources (hypothesis-backed, not guarantees of payout):
 - Notion Information Disclosure Research Lab (backup, historical, source maps, diagnostics)
 - Public writeups: .env/config exposure, source maps, wp-config, git metadata
 - GitHub code-search dork practice: filename/extension/path qualifiers + host AND
+- Hunter playbooks (e.g. Orwa Atyat GitHub recon map): org/host dorks, noise exclusion,
+  localhost demotion, impact-oriented next steps for key types
 
 Families map to Notion ID scenarios + public bounty writeups (env, backup, maps,
 OpenAPI/Swagger attack maps, VCS metadata, diagnostics).
@@ -98,6 +100,22 @@ BOUNTY_QUERY_FAMILIES: dict[str, list[str]] = {
         "filename:Dockerfile",
     ],
     # Diagnostics / debug surfaces
+    # High-signal content dorks used by strong GitHub hunters (Orwa-style map)
+    # Keep short: each becomes host+term; noise NOTs applied at query build time.
+    "hunter_github_dorks": [
+        "password",
+        "secret",
+        "api_key",
+        "AWS_ACCESS_KEY_ID",
+        "DB_PASSWORD",
+        "mongodb+srv",
+        "filename:.env",
+        "filename:id_rsa",
+        "extension:pem",
+        "xoxb-",
+        "firebase",
+        "private_key",
+    ],
     "diagnostics": [
         "filename:trace.axd",
         "filename:phpinfo.php",
