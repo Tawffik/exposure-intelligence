@@ -44,6 +44,11 @@ SECRET_LIKE_SHAPE_RE = re.compile(
 )
 LONG_TOKEN_RE = re.compile(r"^[A-Za-z0-9/+=_\-.]{16,}$")
 
+FIXTURE_PATH_RE = re.compile(
+    r"(?i)(/fixtures?/|/testdata/|/__tests__/|/tests?/|/examples?/|"
+    r"fixture/react|/sample|/mock[s]?/|/demo/)"
+)
+
 EXAMPLE_PATH_RE = re.compile(
     r"(?i)(\.env\.example|\.env\.sample|\.env\.template|\.env\.dist|"
     r"example\.env|config\.example|credentials\.example|/examples?/|"
@@ -138,6 +143,8 @@ def evidence_basis(
         SENSITIVE_NAME_RE.search(url or "")
     )
     is_example = bool(EXAMPLE_PATH_RE.search(url or ""))
+    is_fixture = bool(FIXTURE_PATH_RE.search(url or ""))
+    is_example = is_example or is_fixture
     is_historical = (discovery_mode or "").upper() in {"HISTORICAL", "PASSIVE_INDEX"} or (
         "HISTORICAL" in (classification or "").upper()
     )

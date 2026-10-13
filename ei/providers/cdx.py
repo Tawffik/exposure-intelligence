@@ -247,7 +247,7 @@ class CDXProvider:
         self,
         *,
         api_url: str = DEFAULT_API,
-        timeout: float = 20.0,
+        timeout: float = 12.0,
     ) -> None:
         self.api_url = api_url
         self.timeout = timeout
@@ -326,7 +326,7 @@ class CDXProvider:
         # CDX supports multiple filter params via repeated keys — use urllib list later if needed.
         # Single regex filter on original path:
         if not filter_statuscode:
-            params["filter"] = r"original:.*(/(\.env(\.|$)|\.git/|backup\.(zip|sql|tar|gz)|dump\.sql|database\.sql|wp-config\.php|web\.config|appsettings\.json|id_rsa|\.pem|trace\.axd|phpinfo\.php)|\.(env|sql|zip|map|bak|tar\.gz|pem)([?#]|$))"
+            params["filter"] = r"original:.*(\.env|backup\.|dump\.sql|wp-config|\.git/|\.map|openapi|swagger)"|map|bak|tar\.gz|pem)([?#]|$))"
         qs = urllib.parse.urlencode(params)
         url = f"{self.api_url}?{qs}"
         headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}

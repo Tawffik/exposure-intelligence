@@ -81,6 +81,11 @@ SECRET_PATTERNS = [
     (re.compile(r"(?i)xox[baprs]-"), "slack_token"),
     (re.compile(r"(?i)mongodb(\+srv)?://[^\s'\"]+"), "mongodb_uri"),
     (re.compile(r"(?i)glpat-[A-Za-z0-9_\-]{20,}"), "gitlab_pat"),
+    (re.compile(r"(?i)AIza[0-9A-Za-z\-_]{35}"), "google_api_key"),
+    (re.compile(r"(?i)SG\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}"), "sendgrid_key"),
+    (re.compile(r"(?i)eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"), "jwt_like"),
+    (re.compile(r"(?i)shpat_[a-f0-9]{32}"), "shopify_access_token"),
+    (re.compile(r"(?i)shpca_[a-f0-9]{32}"), "shopify_custom_app_token"),
 ]
 
 

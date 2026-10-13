@@ -40,6 +40,11 @@ BOUNTY_QUERY_FAMILIES: dict[str, list[str]] = {
         "filename:application.properties",
         "filename:config.json",
         "filename:secrets.yml",
+        "filename:credentials.json",
+        "filename:service-account.json",
+        "filename:.aws/credentials",
+        "AKIA",
+        "sk_live_",
     ],
     # Source maps + secret-like tokens in public code
     "source_maps_secrets": [

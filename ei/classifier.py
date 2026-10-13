@@ -45,7 +45,7 @@ ARCHIVE_SIGNATURES = [
     re.compile(r"ustar"),  # tar
 ]
 SENSITIVE_PATH_HINTS = re.compile(
-    r"(?i)(backup|dump|\.env|config\.ya?ml|\.git/|id_rsa|\.pem|credentials|secret|trace\.axd|web\.config)",
+    r"(?i)(backup|dump|\.env|config\.ya?ml|\.git/|id_rsa|\.pem|credentials|secret|trace\.axd|web\.config|service-account|appsettings|\.aws/|wp-config|phpinfo|swagger|openapi|\.map$)",
 )
 TRACE_MARKERS = [
     re.compile(r"Application Trace", re.I),
