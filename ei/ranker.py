@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Iterable
 
+from ei.disclosure_taxonomy import classify_disclosure_signal
 from ei.models import (
     Candidate,
     Classification,
@@ -68,6 +69,17 @@ def observations_to_candidates(observations: Iterable[Observation]) -> list[Cand
             is_dup = True
 
         rank, explanation = score_candidate(primary, group)
+        disc = classify_disclosure_signal(
+            url=primary.discovered_url or "",
+            body=getattr(primary, "body_preview_redacted", "") or "",
+            labels=list(getattr(primary, "labels", None) or []),
+        )
+        if disc.get("disclosure_class") and disc["disclosure_class"] != "GENERIC_PUBLIC":
+            explanation = list(explanation) + [
+                f"disclosure_class={disc['disclosure_class']}",
+                disc.get("label") or "",
+            ]
+
         cand = Candidate(
             stable_key=key,
             target_id=primary.target_id,

@@ -6,6 +6,8 @@ Sources (hypothesis-backed, not guarantees of payout):
 - Public writeups: .env/config exposure, source maps, wp-config, git metadata
 - GitHub code-search dork practice: filename/extension/path qualifiers + host AND
 
+Families map to Notion ID scenarios + public bounty writeups (env, backup, maps,
+OpenAPI/Swagger attack maps, VCS metadata, diagnostics).
 Each family is a list of simple terms (no OR groups) for GitHub code search.
 Callers AND the selected target host: "{host} {term}".
 """
@@ -16,47 +18,91 @@ from typing import Any
 
 # Ordered by expected useful-lead density for info-disclosure programs
 BOUNTY_QUERY_FAMILIES: dict[str, list[str]] = {
-    # Notion H1.1 / Case A — deployment & config artifacts
+    # Config / env (highest bounty density in public writeups)
     "env_config": [
         "filename:.env",
         "filename:.env.local",
         "filename:.env.production",
         "filename:.env.staging",
+        "filename:.env.development",
         "filename:.env.backup",
         "filename:.env.old",
+        "filename:.env.example",
         "filename:wp-config.php",
         "filename:appsettings.json",
+        "filename:web.config",
         "filename:credentials",
         "filename:.git-credentials",
         "filename:.npmrc",
         "filename:.dockercfg",
+        "filename:settings.py",
+        "filename:application.yml",
+        "filename:application.properties",
+        "filename:config.json",
+        "filename:secrets.yml",
     ],
-    # Notion Case B/C style + build artifacts — source maps & secrets presence
+    # Source maps + secret-like tokens in public code
     "source_maps_secrets": [
         "extension:map",
         "filename:sourcemap",
         "AKIA",
         "sk_live_",
+        "sk_test_",
         "ghp_",
+        "gho_",
+        "xoxb-",
         "BEGIN RSA PRIVATE KEY",
+        "BEGIN OPENSSH PRIVATE KEY",
         "filename:id_rsa",
         "extension:pem",
+        "aws_secret_access_key",
+        "private_key",
     ],
-    # Backups / dumps (Case A signals)
+    # Backups / dumps
     "backups_dumps": [
         "filename:backup.zip",
+        "filename:backup.tar.gz",
         "filename:dump.sql",
         "filename:database.sql",
+        "filename:db.sql",
         "extension:sql",
         "filename:backup",
-        "filename:web.config",
+        "filename:site.zip",
+        "filename:www.zip",
+        "filename:public_html.zip",
     ],
-    # Diagnostics (Case E) — path names only; still leads
+    # API surface maps (OpenAPI/Swagger) — attack maps, not secrets by themselves
+    "api_specs": [
+        "filename:openapi.json",
+        "filename:openapi.yaml",
+        "filename:swagger.json",
+        "filename:swagger.yaml",
+        "path:swagger-ui",
+        "filename:api-docs",
+        "path:v3/api-docs",
+        "filename:swagger-ui.html",
+    ],
+    # VCS metadata / source disclosure signals
+    "vcs_meta": [
+        "filename:.git/config",
+        "path:.git",
+        "filename:.svn/entries",
+        "filename:.DS_Store",
+        "filename:composer.json",
+        "filename:package.json",
+        "filename:Dockerfile",
+    ],
+    # Diagnostics / debug surfaces
     "diagnostics": [
         "filename:trace.axd",
         "filename:phpinfo.php",
+        "filename:elmah.axd",
+        "path:actuator",
         "path:debug",
         "filename:server-status",
+        "filename:server-info",
+        "path:graphql",
+        "filename:graphiql",
     ],
 }
 
@@ -65,15 +111,19 @@ DEFAULT_ACTIONS_TERMS: list[str] = [
     "filename:.env",
     "filename:.env.production",
     "filename:.env.local",
-    "extension:map",
     "filename:wp-config.php",
     "filename:appsettings.json",
+    "filename:openapi.json",
+    "filename:swagger.json",
+    "extension:map",
     "AKIA",
     "sk_live_",
     "filename:backup.zip",
-    "extension:sql",
+    "filename:dump.sql",
     "filename:id_rsa",
     "filename:.git-credentials",
+    "path:actuator",
+    "filename:phpinfo.php",
 ]
 
 
