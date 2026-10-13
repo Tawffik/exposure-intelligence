@@ -125,3 +125,66 @@ def test_cdx_exact_host_related():
 
 def test_hostname_from_url_with_port():
     assert hostname_from_url("https://API.Example.com:443/a") == "api.example.com"
+
+
+def test_provider_domain_cannot_override_conflicting_url_host():
+    """URL hostname is authoritative; matching provider_domain must not upgrade."""
+    d = classify_url_host_relationship(
+        target_host="example.com",
+        url="https://evil.test/result",
+        provider_domain="example.com",
+    )
+    assert d["relationship"] == "INDEX_ONLY"
+    assert to_provider_relationship(d) == "INDEX_ONLY"
+    assert d["hostname"] == "evil.test"
+    assert d["provider_domain_conflict"] is True
+    assert d["provider_domain_fallback"] is False
+    assert "conflicts" in d["rationale"].lower() or "conflict" in d["rationale"].lower()
+
+
+def test_url_host_direct_with_conflicting_provider_domain():
+    d = classify_url_host_relationship(
+        target_host="example.com",
+        url="https://example.com/path",
+        provider_domain="evil.test",
+    )
+    assert d["relationship"] == "DIRECT_HOST"
+    assert to_provider_relationship(d) == "RELATED_CANDIDATE"
+    assert d["hostname"] == "example.com"
+    assert d["provider_domain_conflict"] is True
+    assert d["provider_domain_fallback"] is False
+
+
+def test_provider_domain_fallback_when_url_invalid():
+    d = classify_url_host_relationship(
+        target_host="example.com",
+        url="not a url",
+        provider_domain="example.com",
+    )
+    # hostname_from_url("not a url") may yield None → fallback allowed
+    assert d["provider_domain_fallback"] is True
+    assert d["relationship"] == "DIRECT_HOST"
+    assert d["hostname"] == "example.com"
+    assert "fallback" in d["rationale"].lower()
+
+
+def test_provider_domain_fallback_when_url_missing():
+    d = classify_url_host_relationship(
+        target_host="example.com",
+        url="",
+        provider_domain="example.com",
+    )
+    assert d["provider_domain_fallback"] is True
+    assert d["relationship"] == "DIRECT_HOST"
+
+
+def test_notexample_url_with_example_provider_domain():
+    d = classify_url_host_relationship(
+        target_host="example.com",
+        url="https://notexample.com/.env",
+        provider_domain="example.com",
+    )
+    assert d["relationship"] == "INDEX_ONLY"
+    assert to_provider_relationship(d) == "INDEX_ONLY"
+    assert d["hostname"] == "notexample.com"
+    assert d["provider_domain_conflict"] is True

@@ -138,6 +138,8 @@ def normalize_cdx_row(
         "target_relationship_rationale": rationale,
         "host_relationship_detail": rel_detail.get("relationship"),
         "parsed_hostname": rel_detail.get("hostname") or "",
+        "provider_domain_conflict": bool(rel_detail.get("provider_domain_conflict")),
+        "provider_domain_fallback": bool(rel_detail.get("provider_domain_fallback")),
         "textual_match": bool(rel_detail.get("textual_match")),
         "textual_match_fields": list(rel_detail.get("textual_match_fields") or []),
         "path_sensitive_hint": sens_hint,
