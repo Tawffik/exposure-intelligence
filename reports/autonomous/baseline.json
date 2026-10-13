@@ -1,0 +1,50 @@
+{
+  "schema": "ei.autonomous.baseline.v1",
+  "generated_at": "2026-10-13T23:08:08Z",
+  "branch": "feat/id-restructure-v050",
+  "commit": "1176f0ed28e714a78ebfe18c90de7395404abb84",
+  "main_commit": "1f97be262bc33cc6219a20ec2d01d133406e5601",
+  "tests": {
+    "command": "pytest",
+    "passed": 144,
+    "failed": 0
+  },
+  "benchmark": {
+    "total": 9,
+    "classification_accuracy": 1.0,
+    "review_accuracy": 1.0,
+    "corpus": "examples/classification_benchmark.json"
+  },
+  "modules": [
+    "providers: github_code_search, urlscan, cdx",
+    "classifier, evidence_review, ranker, research, store",
+    "host_relationship, query_families, disclosure_taxonomy",
+    "probe (ACTIVE only), planner, registry, benchmark"
+  ],
+  "known_defects_at_baseline": [
+    {
+      "id": "D01",
+      "title": "EXAMPLE_PATH_RE misses .env.local.example and .env.integration.example",
+      "evidence": "shop-cli/.env.integration.example classified POTENTIALLY_SENSITIVE/NEEDS_REVIEW",
+      "severity": "P0"
+    },
+    {
+      "id": "D02",
+      "title": "GitHub secondary rate limit collapses multi-query runs",
+      "evidence": "multiple Actions runs RATE_LIMITED after parallel dispatches",
+      "severity": "P1"
+    },
+    {
+      "id": "D03",
+      "title": "CDX frequent read timeouts",
+      "evidence": "shopify/gitlab runs CDX ERROR Network timeout",
+      "severity": "P1"
+    },
+    {
+      "id": "D04",
+      "title": "Benchmark corpus only 9 cases \u2014 weak family coverage",
+      "evidence": "benchmark total=9",
+      "severity": "P1"
+    }
+  ]
+}

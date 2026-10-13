@@ -371,8 +371,12 @@ def classify_observation(
         # Keyword path match alone is weak without content support
         is_example_path = bool(
             re.search(
-                r"(?i)(\.env\.example|\.env\.sample|\.env\.template|\.env\.dist|"
-                r"example\.env|/examples?/)",
+                r"(?i)("
+                r"\.env\.example|"
+                r"\.env\.[\w.-]*\.example|"
+                r"\.env\.sample|\.env\.template|\.env\.dist|"
+                r"\.env-sample|\.env\.mock|\.env copy|"
+                r"example\.env|/examples?/|workshop|demo-store|sample-app)",
                 url_l,
             )
         )

@@ -97,5 +97,40 @@
     "body": "PK\u0003\u0004fakezip",
     "discovery_mode": "HISTORICAL",
     "note": "Archive content-type \u2014 sensitive type, impact unproven"
+  },
+  {
+    "url": "https://github.com/acme/app/blob/main/.env.local.example",
+    "expected_classification": "IMPACT_UNPROVEN",
+    "expected_review": "LOW_PRIORITY",
+    "note": "Negative: .env.local.example template",
+    "discovery_mode": "PASSIVE_INDEX",
+    "id": "neg_env_local_example",
+    "body": "API_KEY=your_key_here\nPASSWORD=changeme"
+  },
+  {
+    "url": "https://example.com/admin",
+    "expected_classification": "AUTH_REQUIRED",
+    "expected_review": "LOW_PRIORITY",
+    "note": "Login page is not disclosure",
+    "id": "neg_auth_required",
+    "body": "<form action=\"/login\"><input name=\"password\" type=\"password\"></form>"
+  },
+  {
+    "url": "https://example.com/static/app.js.map",
+    "content_type": "application/json",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "NEEDS_REVIEW",
+    "note": "Source map with sourcesContent is a disclosure lead",
+    "id": "pos_source_map_with_sources",
+    "body": "{\"version\":3,\"file\":\"app.js\",\"sources\":[\"webpack:///src/secret.js\"],\"mappings\":\"AAAA\",\"sourcesContent\":[\"const key=process.env.SECRET\"]}"
+  },
+  {
+    "url": "https://example.com/openapi.json",
+    "content_type": "application/json",
+    "expected_classification": "IMPACT_UNPROVEN",
+    "expected_review": "NEEDS_REVIEW",
+    "note": "Public OpenAPI alone is not a vulnerability",
+    "id": "pos_openapi_public",
+    "body": "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"API\"},\"paths\":{\"/users\":{\"get\":{}}}}"
   }
 ]

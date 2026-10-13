@@ -7,6 +7,8 @@ Produces a small, explicit evidence bundle for external consumers
 
 from __future__ import annotations
 
+from ei.hypothesis import build_hypothesis
+
 import json
 from pathlib import Path
 from typing import Any
@@ -41,6 +43,7 @@ def build_export_bundle(
                 "impact_hypothesis": item.get("impact_hypothesis"),
                 "suggested_next_step": item.get("suggested_next_step"),
                 "confirmed_vulnerability": False,
+                "hypothesis": build_hypothesis(item),
             }
         )
     return {

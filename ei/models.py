@@ -72,6 +72,14 @@ class Freshness(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+# Content availability semantics (provider observation contract)
+CONTENT_PRESENT = "PRESENT"
+CONTENT_ABSENT_FROM_SOURCE = "ABSENT_FROM_SOURCE"  # source metadata had no body field
+CONTENT_NOT_FETCHED = "NOT_FETCHED"  # index-only; body never retrieved
+CONTENT_INACCESSIBLE = "INACCESSIBLE"  # auth/network prevented fetch
+CONTENT_CONFIRMED_EMPTY = "CONFIRMED_EMPTY"  # fetched and empty
+CONTENT_UNAVAILABLE = "UNAVAILABLE"  # unknown / provider error
+
 SECRET_PATTERNS = [
     (re.compile(r"(?i)(api[_-]?key|secret|password|token|private[_-]?key)\s*[:=]\s*['\"]?[^\s'\"]{8,}"), "credential_pattern"),
     (re.compile(r"(?i)AKIA[0-9A-Z]{16}"), "aws_access_key_id"),

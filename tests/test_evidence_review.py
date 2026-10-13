@@ -149,3 +149,32 @@ def test_ranker_demotes_example_paths():
     realish = by_url["https://example-authorized.test/.env"]
     assert example.rank_score < realish.rank_score
     assert any("example_template_path_penalty" in x for x in example.rank_explanation)
+
+
+def test_env_local_example_is_low_priority():
+    """Regression: .env.local.example must not stay NEEDS_REVIEW as a secret lead."""
+    from ei.evidence_review import EXAMPLE_PATH_RE, review_queue_item
+    url = "https://github.com/acme/app/blob/main/.env.local.example"
+    assert EXAMPLE_PATH_RE.search(url)
+    item = {
+        "url": url,
+        "classification": "POTENTIALLY_SENSITIVE",
+        "classification_reason_codes": [
+            "sensitive_path_with_content",
+            "secret_pattern:credential_pattern",
+        ],
+        "confidence_rationale": "Sensitive path and secret-like pattern present",
+        "body_preview_redacted": "API_KEY=changeme\nSECRET=xxx",
+        "discovery_mode": "PASSIVE_INDEX",
+        "target_relationship": "INDEX_ONLY",
+    }
+    out = review_queue_item(item)
+    assert out["review_decision"] == "LOW_PRIORITY"
+    assert out.get("example_or_template_path") is True or (out.get("evidence_review") or {}).get("example_or_template_path")
+
+
+def test_env_integration_example_matched():
+    from ei.evidence_review import EXAMPLE_PATH_RE
+    assert EXAMPLE_PATH_RE.search(
+        "https://github.com/x/y/blob/abc/.env.integration.example"
+    )

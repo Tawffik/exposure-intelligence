@@ -50,10 +50,22 @@ FIXTURE_PATH_RE = re.compile(
 )
 
 EXAMPLE_PATH_RE = re.compile(
-    r"(?i)(\.env\.example|\.env\.sample|\.env\.template|\.env\.dist|"
-    r"example\.env|config\.example|credentials\.example|/examples?/|"
-    r"workshop|demo-store|hydrogen-demo|tutorial|getting-started|"
-    r"sample-app|starter-template)"
+    r"(?i)("
+    r"\.env\.example|"
+    r"\.env\.[\w.-]*\.example|"
+    r"\.env\.sample|"
+    r"\.env\.template|"
+    r"\.env\.dist|"
+    r"\.env-sample|"
+    r"\.env\.mock|"
+    r"\.env copy|"
+    r"example\.env|"
+    r"config\.example|"
+    r"credentials\.example|"
+    r"/examples?/|"
+    r"workshop|demo-store|hydrogen-demo|tutorial|"
+    r"getting-started|sample-app|starter-template"
+    r")"
 )
 
 SENSITIVE_NAME_RE = re.compile(
