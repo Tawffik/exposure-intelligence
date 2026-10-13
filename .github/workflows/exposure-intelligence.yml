@@ -10,7 +10,7 @@ on:
         required: true
         type: string
       research_mode:
-        description: "passive = public GitHub index when GITHUB_TOKEN is set; demo = offline fixtures only (never labeled as live)."
+        description: "passive = public indexes: GitHub Code Search (needs GITHUB_TOKEN) + URLScan search + Internet Archive CDX (public APIs; target hostname is sent as query). demo = offline fixtures only (never labeled as live)."
         required: true
         type: choice
         options:
@@ -18,7 +18,7 @@ on:
           - demo
         default: passive
       authorization_status:
-        description: "Program authorization for THIS target. UNKNOWN keeps live host requests denied. ACTIVE does not enable host probing in this workflow version."
+        description: "Program authorization for THIS target. UNKNOWN/PAUSED/EXPIRED keep application-host probing denied. This workflow does NOT enable live host probing even when ACTIVE (library supports probes only via explicit profile + CLI path)."
         required: true
         type: choice
         options:
@@ -33,7 +33,7 @@ on:
         type: string
         default: "filename:.env OR filename:.env.production OR filename:.env.local OR extension:map OR filename:wp-config.php OR AKIA OR sk_live_ OR filename:backup.zip"
       max_results:
-        description: "Max GitHub code-search results (1–30)."
+        description: "Max results budget applied per provider collection (GitHub multi-query total, URLScan size, CDX limit). Typical range 1–30."
         required: false
         type: string
         default: "10"

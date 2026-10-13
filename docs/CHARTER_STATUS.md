@@ -29,3 +29,7 @@ Mapped against *Exposure Intelligence — Independent Project Charter & Engineer
 Estimated P0-P1 slice: **~95%**.
 
 Non-goals respected: no vuln oracle, no secret storage, no CAPTCHA evasion, no exploitation.
+
+
+## Attribution note (2026-10-13)
+URLScan/CDX previously used substring `host in url`. Fixed to shared DNS-boundary helper (`ei/host_relationship.py`). Textual matches remain metadata only.

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ei.models import DiscoveryMode, RunStatus, SourceFidelity, utc_now_iso
+from ei.host_relationship import classify_url_host_relationship, to_provider_relationship
 from ei.providers.base import ProviderCollectResult
 
 PROVIDER_NAME = "internet_archive_cdx"
@@ -89,15 +90,14 @@ def normalize_cdx_row(
     if ts and original:
         wayback = f"https://web.archive.org/web/{ts}/{original}"
 
-    host = (target_host or "").strip().lower().rstrip(".")
-    relationship = "INDEX_ONLY"
-    rationale = "Historical CDX index row; not proof of current exposure."
-    if host and host in (original or "").lower():
-        relationship = "RELATED_CANDIDATE"
-        rationale = (
-            f"CDX original URL references selected host '{host}'. "
-            "Historical only; current reachability unknown."
-        )
+    rel_detail = classify_url_host_relationship(
+        target_host=target_host, url=original or "", provider_domain=""
+    )
+    relationship = to_provider_relationship(rel_detail)
+    rationale = (
+        "Historical CDX index row; not proof of current exposure. "
+        + (rel_detail.get("rationale") or "")
+    )
 
     # Sensitive-looking path heuristics (filename only — never treat as confirmed)
     path_lower = (original or "").lower()
@@ -136,8 +136,10 @@ def normalize_cdx_row(
         "selected_target_host": target_host,
         "target_relationship": relationship,
         "target_relationship_rationale": rationale,
-        "textual_match": bool(host and host in (original or "").lower()),
-        "textual_match_fields": ["original"] if host and host in (original or "").lower() else [],
+        "host_relationship_detail": rel_detail.get("relationship"),
+        "parsed_hostname": rel_detail.get("hostname") or "",
+        "textual_match": bool(rel_detail.get("textual_match")),
+        "textual_match_fields": list(rel_detail.get("textual_match_fields") or []),
         "path_sensitive_hint": sens_hint,
         "source_artifact_url": wayback or original,
         "freshness": "HISTORICAL",

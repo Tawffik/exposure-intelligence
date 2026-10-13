@@ -12,7 +12,7 @@ This repository is the implementation of the [Exposure Intelligence project char
 - **Explainable classification and ranking** — scores come with reason codes; an exposed artifact is not automatically a vulnerability.
 - **Safety first** — offline fixtures by default; secrets are redacted; no live probing without separate authorization policy (not enabled in MVP).
 
-## Status (v0.3.0)
+## Status (v0.4.0)
 
 | Capability | Status |
 | --- | --- |
@@ -37,6 +37,9 @@ This repository is the implementation of the [Exposure Intelligence project char
 | Classification benchmark CLI + corpus | Implemented (accuracy gate) |
 | Versioned export adapter (ei.export.v1) | Implemented |
 | Evidence review (path vs content) | Implemented + tested |
+| Shared DNS-boundary host attribution (URLScan/CDX/GitHub) | Implemented + tested |
+| max_results = per-provider collection budget | Documented |
+
 | Daily scheduler | Not yet (manual workflow_dispatch; charter after probe stability) |
 | Paid indexes (Shodan/FOFA/VT) | Deferred per charter |
 

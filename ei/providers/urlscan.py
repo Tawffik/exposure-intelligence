@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ei.models import DiscoveryMode, RunStatus, SourceFidelity, utc_now_iso
+from ei.host_relationship import classify_url_host_relationship, to_provider_relationship
 from ei.providers.base import ProviderCollectResult
 
 PROVIDER_NAME = "urlscan"
@@ -69,22 +70,15 @@ def normalize_urlscan_item(
     title = page.get("title") or ""
     tls = page.get("tlsIssuer") or page.get("tlsValidDays") or ""
 
-    # Relationship: URLScan domain match is index evidence only
-    host = (target_host or "").strip().lower().rstrip(".")
-    relationship = "INDEX_ONLY"
-    rationale = "Public URLScan index record; not current-state verification."
-    if host and domain and host == domain.lower().rstrip("."):
-        relationship = "RELATED_CANDIDATE"
-        rationale = (
-            f"URLScan page.domain equals selected host '{host}'. "
-            "Index-only; age and reachability unverified."
-        )
-    elif host and host in (url or "").lower():
-        relationship = "RELATED_CANDIDATE"
-        rationale = (
-            f"Selected host '{host}' appears in scanned URL. "
-            "Index-only; not a verified exposure."
-        )
+    # Relationship: DNS-boundary hostname only (not path/query substring)
+    rel_detail = classify_url_host_relationship(
+        target_host=target_host, url=url or "", provider_domain=domain or ""
+    )
+    relationship = to_provider_relationship(rel_detail)
+    rationale = (
+        "Public URLScan index record; not current-state verification. "
+        + (rel_detail.get("rationale") or "")
+    )
 
     preview = f"title={title[:80]} server={server} status={status_code}"
     meta = {
@@ -109,8 +103,10 @@ def normalize_urlscan_item(
         "selected_target_host": target_host,
         "target_relationship": relationship,
         "target_relationship_rationale": rationale,
-        "textual_match": bool(host and (host in (url or "").lower() or host == (domain or "").lower())),
-        "textual_match_fields": ["url", "domain"] if host else [],
+        "host_relationship_detail": rel_detail.get("relationship"),
+        "parsed_hostname": rel_detail.get("hostname") or "",
+        "textual_match": bool(rel_detail.get("textual_match")),
+        "textual_match_fields": list(rel_detail.get("textual_match_fields") or []),
         "source_artifact_url": result_api or url,
     }
     return {
