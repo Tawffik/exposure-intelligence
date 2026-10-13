@@ -87,14 +87,20 @@ def test_unrelated_repo_normalize_not_direct():
 
 def test_query_variants_no_duplicate_host():
     qs = build_target_scoped_query_variants("example.com", "filename:.env OR extension:map")
-    assert qs == ["example.com filename:.env", "example.com extension:map"]
+    assert len(qs) == 2
+    assert qs[0].startswith("example.com filename:.env")
+    assert qs[1].startswith("example.com extension:map")
     for q in qs:
         assert q.count("example.com") == 1
+        # Hunter noise filters may append NOT localhost / NOT 127.0.0.1
+        assert "NOT localhost" in q
 
 
 def test_query_variants_strips_prescoped():
     qs = build_target_scoped_query_variants("example.com", "example.com filename:.env")
-    assert qs == ["example.com filename:.env"]
+    assert len(qs) == 1
+    assert qs[0].startswith("example.com filename:.env")
+    assert qs[0].count("example.com") == 1
 
 
 def test_collect_live_records_exact_queries(monkeypatch):
