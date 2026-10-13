@@ -529,12 +529,19 @@ class GitHubCodeSearchProvider:
         notes: list[str] = []
         last_status = RunStatus.COMPLETED_ZERO.value
         errors: list[str] = []
+        n_q = max(len(queries), 1)
+        # Reserve slots across queries so org: does not monopolize max_total
+        per_query_cap = max(2, min(per_page, max(2, max_total // min(n_q, 4))))
         for q in queries:
             if len(merged) >= max_total:
                 break
             remaining = max_total - len(merged)
-            r = self.collect_live(q, per_page=min(per_page, remaining), target_host=target_host)
-            time.sleep(2.5)  # soft pacing against secondary rate limits
+            # Soft preference: leave room for later host-scoped families
+            take = min(per_page, remaining, per_query_cap)
+            if q.startswith("org:") and remaining > per_query_cap:
+                take = min(take, 3)
+            r = self.collect_live(q, per_page=take, target_host=target_host)
+            time.sleep(2.0)  # soft pacing against secondary rate limits
             notes.append(f"{q!r}->{r.status}/{len(r.records)}")
             if r.status == RunStatus.NOT_CONFIGURED.value:
                 return r

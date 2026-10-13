@@ -39,6 +39,19 @@ def build_urlscan_query(target_host: str) -> str:
     return f"domain:{host}"
 
 
+def build_urlscan_query_variants(target_host: str) -> list[str]:
+    """High-signal public-scan queries (search only; no new scan submission)."""
+    base = build_urlscan_query(target_host)
+    # URLScan search supports filename: and page.url: on indexed scans
+    return [
+        base,
+        f'{base} AND filename:.env',
+        f'{base} AND filename:config',
+        f'{base} AND page.url:".git"',
+        f'{base} AND page.url:backup',
+    ]
+
+
 def normalize_urlscan_item(
     item: dict[str, Any],
     *,
@@ -167,6 +180,44 @@ class URLScanProvider:
             os.environ.get("URLSCAN_API_KEY") or os.environ.get("URLSCAN_KEY") or ""
         )
         self.timeout = timeout
+
+
+    def collect_live_query(self, query: str, *, size: int = 5) -> ProviderCollectResult:
+        """Run an arbitrary URLScan search query (passive index only)."""
+        size = max(1, min(int(size), 50))
+        q = (query or "").strip()
+        if not q:
+            return ProviderCollectResult(
+                status=RunStatus.ERROR.value,
+                error_summary="empty query",
+                provider=PROVIDER_NAME,
+            )
+        params = urllib.parse.urlencode({"q": q, "size": str(size)})
+        url = f"{self.api_url}?{params}"
+        headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+        if self.api_key:
+            headers["API-Key"] = self.api_key
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                body = resp.read()
+        except Exception as e:  # noqa: BLE001
+            return ProviderCollectResult(
+                status=RunStatus.ERROR.value,
+                error_summary=f"{type(e).__name__}: {e}"[:300],
+                query=q,
+                provider=PROVIDER_NAME,
+            )
+        try:
+            payload = json.loads(body.decode("utf-8", errors="replace"))
+        except Exception as e:  # noqa: BLE001
+            return ProviderCollectResult(
+                status=RunStatus.ERROR.value,
+                error_summary=f"json: {e}",
+                query=q,
+                provider=PROVIDER_NAME,
+            )
+        return normalize_urlscan_search_response(payload, query=q)
 
     def collect_from_fixture(
         self,

@@ -330,6 +330,23 @@ def run_research(
         else:
             try:
                 us_result = URLScanProvider().collect_live(host_for_q, size=max_results)
+                # Supplemental high-signal search (existing public scans only)
+                try:
+                    us2 = URLScanProvider().collect_live_query(
+                        f"domain:{host_for_q} AND filename:.env",
+                        size=min(5, int(max_results)),
+                    )
+                    if us2.records:
+                        seen = {r.get("url") for r in us_result.records}
+                        for rec in us2.records:
+                            if rec.get("url") not in seen:
+                                us_result.records.append(rec)
+                        us_result.coverage_notes = (
+                            (us_result.coverage_notes or "")
+                            + f" +filename:.env supplemental={len(us2.records)}"
+                        )
+                except Exception:
+                    pass
             except Exception as e:  # noqa: BLE001 — provider must not crash research
                 us_result = ProviderCollectResult(
                     status=RunStatus.ERROR.value,
