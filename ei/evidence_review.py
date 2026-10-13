@@ -234,6 +234,13 @@ def review_candidate(
         )
         if decision == "POTENTIAL_EXPOSURE_UNCONFIRMED":
             decision = "NEEDS_REVIEW"
+        # Generic public-index pages without sensitive path/content are not bounty leads
+        if classification in {"UNKNOWN", "IMPACT_UNPROVEN", "INTENTIONALLY_PUBLIC"} and not secret_like_keys:
+            if not basis.get("path_sensitive_name"):
+                decision = "LOW_PRIORITY"
+                rationale_parts.append(
+                    "Index-only generic page without sensitive path/content — deprioritized."
+                )
 
     return {
         "review_decision": decision,
