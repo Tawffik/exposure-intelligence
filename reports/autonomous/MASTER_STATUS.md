@@ -10,3 +10,10 @@
 - **Release decision:** **READY_WITH_LIMITATIONS**
 - **Blockers:** GitHub secondary rate limits on dense Actions dispatches; CDX timeouts; indirect disclosure requires ACTIVE auth + lab
 - **Updated:** 2026-10-13T23:10:56Z
+
+
+## Pre-merge focused review (2026-10-13T23:21:14Z)
+- D05: 401/403 classification uses body evidence (WAF → GENERIC_ERROR; login → AUTH_REQUIRED).
+- Benchmark: 16 cases, accuracy 1.0.
+- Full pytest green after fix.
+- Merge still deferred pending CI on this commit + human PR review.

@@ -56,14 +56,14 @@
   },
   {
     "id": "neg_waf_block",
-    "expected_classification": "AUTH_REQUIRED",
+    "expected_classification": "GENERIC_ERROR",
     "expected_review": "LOW_PRIORITY",
     "url": "https://example-authorized.test/admin",
     "status": 403,
     "content_type": "text/html",
     "body": "Attention Required! | Cloudflare<br/>Request blocked",
     "discovery_mode": "CURRENT_OBSERVATION",
-    "note": "HTTP 403 auth/blocked status path"
+    "note": "WAF/block page (may be 403) is GENERIC_ERROR not AUTH_REQUIRED"
   },
   {
     "id": "pos_git_head",
@@ -132,5 +132,38 @@
     "note": "Public OpenAPI alone is not a vulnerability",
     "id": "pos_openapi_public",
     "body": "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"API\"},\"paths\":{\"/users\":{\"get\":{}}}}"
+  },
+  {
+    "id": "neg_403_cloudflare_waf",
+    "expected_classification": "GENERIC_ERROR",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://example.com/admin",
+    "status": 403,
+    "content_type": "text/html",
+    "body": "<html><title>Attention Required! | Cloudflare</title>cf-error-details Ray ID</html>",
+    "discovery_mode": "FIXTURE",
+    "note": "403 WAF block is not AUTH_REQUIRED"
+  },
+  {
+    "id": "neg_401_login_form",
+    "expected_classification": "AUTH_REQUIRED",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://example.com/account",
+    "status": 401,
+    "content_type": "text/html",
+    "body": "<html><form method=\"post\" action=\"/login\"><input name=\"password\" type=\"password\"></form></html>",
+    "discovery_mode": "FIXTURE",
+    "note": "401 with login form markers"
+  },
+  {
+    "id": "neg_403_opaque_deny",
+    "expected_classification": "AUTH_REQUIRED",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://example.com/api/private",
+    "status": 403,
+    "content_type": "application/json",
+    "body": "{\"error\":\"forbidden\"}",
+    "discovery_mode": "FIXTURE",
+    "note": "403 opaque JSON deny without WAF fingerprints"
   }
 ]

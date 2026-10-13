@@ -27,6 +27,11 @@ WAF_MARKERS = [
     re.compile(r"Access Denied", re.I),
     re.compile(r"Request blocked", re.I),
     re.compile(r"aws_waf", re.I),
+    re.compile(r"cf-error-details", re.I),
+    re.compile(r"cloudflare ray id", re.I),
+    re.compile(r"the requested URL was rejected", re.I),
+    re.compile(r"Akamai|Reference\s*#", re.I),
+    re.compile(r"blocked by.*security policy", re.I),
 ]
 LOGIN_MARKERS = [
     re.compile(r"<form[^>]+(login|signin|auth)", re.I),
@@ -175,11 +180,41 @@ def classify_observation(
             reasons.append("mirror_source")
 
     if status is not None and status in (401, 403):
+        # Status alone does not prove *why* access was denied.
+        # Prefer body evidence: WAF/block pages vs login forms vs opaque deny.
+        if body.strip() and _matches_any(body, WAF_MARKERS):
+            return (
+                Classification.GENERIC_ERROR.value,
+                ["http_forbidden_status", "waf_or_block_page"],
+                0.85,
+                f"HTTP {status} with WAF/block-page fingerprints — access policy/edge block, "
+                "not proven application authentication challenge.",
+                SensitivityClass.NONE.value,
+                freshness,
+            )
+        if body.strip() and _matches_any(body, LOGIN_MARKERS):
+            return (
+                Classification.AUTH_REQUIRED.value,
+                ["http_auth_status", "login_form_markers"],
+                0.88,
+                f"HTTP {status} with login/sign-in form markers — authentication challenge likely.",
+                SensitivityClass.NONE.value,
+                freshness,
+            )
+        if not body.strip():
+            return (
+                Classification.AUTH_REQUIRED.value,
+                ["http_auth_status", "empty_body"],
+                0.7,
+                f"HTTP {status} with empty body — often auth or ACL deny; reason not confirmed from content.",
+                SensitivityClass.NONE.value,
+                freshness,
+            )
         return (
             Classification.AUTH_REQUIRED.value,
-            ["http_auth_status"],
-            0.85,
-            f"HTTP {status} indicates authentication or authorization is required.",
+            ["http_auth_status", "opaque_deny_body"],
+            0.75,
+            f"HTTP {status} with non-WAF body — treated as auth/ACL deny without stronger evidence.",
             SensitivityClass.NONE.value,
             freshness,
         )
