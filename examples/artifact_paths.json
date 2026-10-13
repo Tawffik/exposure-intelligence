@@ -1,0 +1,23 @@
+{
+  "schema_version": "1",
+  "note": "Low-volume path candidates for authorized CURRENT_OBSERVATION only. Not a brute-force wordlist.",
+  "paths": [
+    "/.env",
+    "/.env.local",
+    "/.env.production",
+    "/.env.backup",
+    "/backup.zip",
+    "/backup.sql",
+    "/dump.sql",
+    "/database.sql",
+    "/.git/HEAD",
+    "/.git/config",
+    "/wp-config.php",
+    "/web.config",
+    "/appsettings.json",
+    "/phpinfo.php",
+    "/trace.axd",
+    "/server-status",
+    "/robots.txt"
+  ]
+}

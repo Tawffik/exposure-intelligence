@@ -17,6 +17,7 @@ import hashlib
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -56,16 +57,35 @@ def _host_in_scope(profile: ProgramProfile, url: str) -> bool:
     return False
 
 
+def load_artifact_path_catalog(root: Optional[Path] = None) -> list[str]:
+    """Bounded sensitive-path catalog for authorized probes only."""
+    root = root or Path(__file__).resolve().parents[1]
+    path = root / "examples" / "artifact_paths.json"
+    try:
+        import json
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return list(data.get("paths") or [])
+    except (OSError, json.JSONDecodeError, TypeError):
+        return ["/.env", "/backup.zip", "/.git/HEAD"]
+
+
 def plan_probe_urls(
     profile: ProgramProfile,
     candidate_urls: list[str],
     *,
     budget: int = 5,
+    include_catalog: bool = False,
 ) -> list[str]:
     """Select in-scope http(s) URLs only, up to budget."""
     out: list[str] = []
     seen: set[str] = set()
-    for u in candidate_urls:
+    expanded = list(candidate_urls)
+    if include_catalog:
+        hosts = list(profile.in_scope_hosts or [])[:2]
+        for h in hosts:
+            for path in load_artifact_path_catalog()[:12]:
+                expanded.append(f"https://{h}{path}")
+    for u in expanded:
         if len(out) >= max(1, budget):
             break
         if not u or not u.startswith(("http://", "https://")):
@@ -205,7 +225,7 @@ def collect_probes(
             provider=PROVIDER_NAME,
         )
 
-    urls = plan_probe_urls(profile, candidate_urls, budget=budget)
+    urls = plan_probe_urls(profile, candidate_urls, budget=budget, include_catalog=True)
     if not urls:
         return ProviderCollectResult(
             status=RunStatus.COMPLETED_ZERO.value,

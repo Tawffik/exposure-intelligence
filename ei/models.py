@@ -77,7 +77,12 @@ SECRET_PATTERNS = [
     (re.compile(r"(?i)AKIA[0-9A-Z]{16}"), "aws_access_key_id"),
     (re.compile(r"(?i)-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----"), "private_key_pem"),
     (re.compile(r"(?i)(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}"), "github_token"),
+    (re.compile(r"(?i)sk_live_[0-9a-zA-Z]{20,}"), "stripe_live_key"),
+    (re.compile(r"(?i)xox[baprs]-"), "slack_token"),
+    (re.compile(r"(?i)mongodb(\+srv)?://[^\s'\"]+"), "mongodb_uri"),
+    (re.compile(r"(?i)glpat-[A-Za-z0-9_\-]{20,}"), "gitlab_pat"),
 ]
+
 
 
 def utc_now_iso() -> str:
