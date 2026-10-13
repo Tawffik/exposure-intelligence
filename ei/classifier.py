@@ -462,13 +462,13 @@ def classify_observation(
 
 def build_observation_from_fixture(record: dict, run_id: str = "", target_id: str = "") -> Observation:
     """Build a fully classified Observation from a fixture/raw record."""
-    body = record.get("body", "") or ""
+    body = record.get("body", "") or record.get("body_preview_redacted", "") or ""
     preview, redacted = redact_text(body)
     sha = content_hash(body) if body else ""
     is_dup = bool(record.get("is_duplicate", False))
     classification, reasons, conf, rationale, sens, fresh = classify_observation(
         url=record.get("url", ""),
-        status=record.get("status"),
+        status=record.get("status") if record.get("status") is not None else record.get("http_status"),
         content_type=record.get("content_type", ""),
         body=body,
         discovery_mode=record.get("discovery_mode", DiscoveryMode.FIXTURE.value),
@@ -485,7 +485,7 @@ def build_observation_from_fixture(record: dict, run_id: str = "", target_id: st
         discovered_url=record.get("url", ""),
         discovery_mode=record.get("discovery_mode", DiscoveryMode.FIXTURE.value),
         source_fidelity=record.get("source_fidelity", "ORIGINAL"),
-        http_status=record.get("status"),
+        http_status=record.get("status") if record.get("status") is not None else record.get("http_status"),
         content_type=record.get("content_type", ""),
         body_byte_count=len(body.encode("utf-8", errors="replace")),
         body_sha256=sha,

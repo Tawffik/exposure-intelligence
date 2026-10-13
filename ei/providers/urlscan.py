@@ -113,20 +113,30 @@ def normalize_urlscan_item(
         "textual_match_fields": ["url", "domain"] if host else [],
         "source_artifact_url": result_api or url,
     }
+    # status/body aliases required by build_observation_from_fixture / classifier
+    # (http_status + body_preview_redacted alone were classified as EMPTY_RESPONSE)
+    st = int(status_code) if isinstance(status_code, int) else (
+        int(status_code) if str(status_code).isdigit() else None
+    )
+    body_text = preview[:500] if preview else (
+        f"[urlscan summary] domain={domain} title={title[:120]} server={server}"
+    )
     return {
         "url": url or result_api or f"urlscan://{scan_id}",
         "observed_at": observed,
         "discovery_mode": DiscoveryMode.PASSIVE_INDEX.value,
         "source_fidelity": SourceFidelity.SUMMARY.value,
-        "http_status": int(status_code) if isinstance(status_code, int) else None,
-        "content_type": "",
-        "body_preview_redacted": preview[:500],
+        "status": st,
+        "http_status": st,
+        "content_type": "text/plain",
+        "body": body_text,
+        "body_preview_redacted": body_text,
         "body_truncated": True,
         "provider": PROVIDER_NAME,
         "check_family": CHECK_FAMILY,
         "scope_decision": "PUBLIC_INDEX",
         "metadata": meta,
-        "labels": ["urlscan", "passive_index"],
+        "labels": ["urlscan", "passive_index", "index_summary_only"],
     }
 
 

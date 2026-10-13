@@ -87,6 +87,13 @@ def observations_to_candidates(observations: Iterable[Observation]) -> list[Cand
             source_fidelity=primary.source_fidelity,
             evidence_summary=_evidence_summary(primary, group),
             classification_reason_codes=list(primary.classification_reason_codes or []),
+            target_relationship=(
+                (primary.metadata or {}).get("target_relationship")
+                or ((primary.metadata or {}).get("metadata") or {}).get("target_relationship")
+                or ""
+            ),
+            scope_decision=primary.scope_decision or "",
+            discovery_mode=primary.discovery_mode or "",
         )
         if is_dup:
             cand.rank_score = 0.0
