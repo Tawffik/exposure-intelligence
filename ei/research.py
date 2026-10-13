@@ -23,6 +23,7 @@ from ei.pipeline import load_fixture_file, run_pipeline
 from ei.profile import ProgramProfile, assess_relevance, live_request_permitted, validate_profile
 from ei.providers.base import ProviderCollectResult
 from ei.providers.cdx import CDXProvider
+from ei.query_families import select_query_terms
 from ei.providers.github_code_search import (
     GitHubCodeSearchProvider,
     build_target_scoped_query_variants,
@@ -237,7 +238,13 @@ def run_research(
         else:
             host_for_q = target_host or (profile.in_scope_hosts[0] if profile.in_scope_hosts else "")
             if host_for_q:
-                variants = build_target_scoped_query_variants(host_for_q, github_live_query or "", limit=8)
+                gq = github_live_query or ""
+                if gq.lower().startswith("family:") or not gq.strip():
+                    fam = gq.split(":", 1)[1].strip() if ":" in gq else "all"
+                    terms = select_query_terms(family=fam or "all", limit=max(1, min(int(max_results), 16)))
+                    variants = [f"{host_for_q} {term}" for term in terms]
+                else:
+                    variants = build_target_scoped_query_variants(host_for_q, gq, limit=8)
                 gh_result = gh.collect_live_multi(
                     variants,
                     per_page=max(1, min(int(max_results), 40)),

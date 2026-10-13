@@ -14,6 +14,7 @@ from typing import Any, Optional
 
 from ei.profile import ProgramProfile, profile_from_dict, validate_profile
 from ei.report import write_report_bundle
+from ei.query_families import select_query_terms
 from ei.research import run_research
 from ei.store import ResearchStore
 from ei.validate_input import sanitize_target_input, validate_budget
@@ -179,7 +180,7 @@ def run_actions_job(
                 fixture_path=None,
                 github_fixture=None,
                 github_live_query=(
-                    (github_query or "filename:.env OR extension:map") if token else None
+                    _resolve_github_live_query(github_query) if token else None
                 ),
                 allow_live_github=bool(token),
                 urlscan_fixture=None,
