@@ -243,6 +243,10 @@ def run_research(
                     fam = gq.split(":", 1)[1].strip() if ":" in gq else "all"
                     terms = select_query_terms(family=fam or "all", limit=max(1, min(int(max_results), 6)))
                     variants = [f"{host_for_q} {term}" for term in terms]
+                    # Prefer org-scoped env search when hostname label is a plausible org
+                    brand = host_for_q.split(".")[0]
+                    if brand and brand.isalpha() and len(brand) >= 3:
+                        variants = [f"org:{brand} filename:.env", f"org:{brand} filename:.env.production"] + variants
                 else:
                     variants = build_target_scoped_query_variants(host_for_q, gq, limit=8)
                 gh_result = gh.collect_live_multi(

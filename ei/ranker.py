@@ -74,6 +74,11 @@ def observations_to_candidates(observations: Iterable[Observation]) -> list[Cand
             body=getattr(primary, "body_preview_redacted", "") or "",
             labels=list(getattr(primary, "labels", None) or []),
         )
+        url_l = (primary.discovered_url or "").lower()
+        if url_l.rstrip("/").endswith(".env") or "/.env." in url_l:
+            if ".example" not in url_l and ".sample" not in url_l:
+                rank = min(1.0, rank + 0.12)
+                explanation = list(explanation) + ["env_filename_boost"]
         if disc.get("disclosure_class") and disc["disclosure_class"] != "GENERIC_PUBLIC":
             explanation = list(explanation) + [
                 f"disclosure_class={disc['disclosure_class']}",
