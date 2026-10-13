@@ -79,6 +79,16 @@ def observations_to_candidates(observations: Iterable[Observation]) -> list[Cand
             if ".example" not in url_l and ".sample" not in url_l:
                 rank = min(1.0, rank + 0.12)
                 explanation = list(explanation) + ["env_filename_boost"]
+        md = primary.metadata if isinstance(getattr(primary, "metadata", None), dict) else {}
+        if md.get("org_brand_match"):
+            rank = min(1.0, rank + 0.15)
+            explanation = list(explanation) + ["org_brand_rank_boost"]
+        # Boost official GitHub org paths matching target brand (e.g. /Shopify/)
+        brand = (primary.target_id or "").split("-")[0]
+        url_path = primary.discovered_url or ""
+        if brand and len(brand) >= 3 and f"/{brand}/" in url_path.replace("https://github.com/", "/"):
+            rank = min(1.0, rank + 0.1)
+            explanation = list(explanation) + ["github_org_path_boost"]
         if disc.get("disclosure_class") and disc["disclosure_class"] != "GENERIC_PUBLIC":
             explanation = list(explanation) + [
                 f"disclosure_class={disc['disclosure_class']}",
