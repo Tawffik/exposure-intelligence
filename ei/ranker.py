@@ -174,7 +174,15 @@ def score_candidate(primary: Observation, group: list[Observation]) -> tuple[flo
             "rank_note=filename/path hints are not content-confirmed secrets"
         )
 
+    # Boost official-looking org repos for the selected brand (still not a finding)
+    md = primary.metadata or {}
+    nested = md.get("metadata") if isinstance(md.get("metadata"), dict) else {}
+    if md.get("org_brand_match") or nested.get("org_brand_match"):
+        score = min(1.0, score * 1.25 + 0.05)
+        explanation.append("org_brand_match_boost")
+
     if primary.classification == Classification.EMPTY_RESPONSE.value:
+
         score *= 0.2
         explanation.append("empty_response_penalty")
     if primary.classification == Classification.HISTORICAL_ONLY.value:

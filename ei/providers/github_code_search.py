@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ei.models import DiscoveryMode, RunStatus, SourceFidelity, utc_now_iso
+from ei.query_families import select_query_terms, org_matches_target
 
 
 PROVIDER_NAME = "github_code_search"
@@ -87,26 +88,12 @@ def build_target_scoped_query_variants(target_host: str, base_terms: str = "", *
     host = (target_host or "").strip().lower().rstrip(".")
     for ch in "(){}[]\"\"'":
         host = host.replace(ch, "")
-    default_terms = ["filename:.env", "filename:.env.example", "extension:map", "filename:backup"]
-    terms: list[str] = []
     raw = (base_terms or "").strip()
-    if raw:
-        # If caller passed an already-scoped "host term" string, strip leading host
-        if host and raw.lower().startswith(host.lower()):
-            raw = raw[len(host):].strip()
-        parts = []
-        buf = raw
-        for sep in [" OR ", " or "]:
-            if sep in buf:
-                parts = [x.strip().strip("()") for x in buf.split(sep)]
-                break
-        if not parts:
-            parts = [raw.strip().strip("()")] if raw.strip() else []
-        terms = [p for p in parts if p]
-    if not terms:
-        terms = default_terms
+    if host and raw.lower().startswith(host.lower()):
+        raw = raw[len(host):].strip()
+    terms = select_query_terms(base_terms=raw, family="default", limit=max(1, limit))
     queries = []
-    for term in terms[: max(1, limit)]:
+    for term in terms:
         queries.append(f"{host} {term}")
     return queries
 
@@ -329,6 +316,7 @@ def normalize_github_item(
             "textual_match": rel.get("textual_match", False),
             "textual_match_fields": rel.get("textual_match_fields") or [],
             "selected_target_host": target_host,
+            "org_brand_match": org_matches_target(full_name, target_host),
         },
     }
 

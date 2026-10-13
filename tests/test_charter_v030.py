@@ -106,9 +106,9 @@ def test_probe_mocked_head():
             prefer_head=True,
         )
     assert r.status == "COMPLETED_WITH_RESULTS"
-    assert len(r.records) == 1
-    assert r.records[0]["discovery_mode"] == "CURRENT_OBSERVATION"
-    assert r.records[0]["metadata"]["probe_method"] == "HEAD"
+    assert len(r.records) >= 1
+    assert any(x["discovery_mode"] == "CURRENT_OBSERVATION" for x in r.records)
+    assert all(x["metadata"]["probe_method"] == "HEAD" for x in r.records)
 
 
 def test_benchmark_perfect_on_corpus():

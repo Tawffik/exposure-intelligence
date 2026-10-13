@@ -227,17 +227,17 @@ def run_research(
         else:
             host_for_q = target_host or (profile.in_scope_hosts[0] if profile.in_scope_hosts else "")
             if host_for_q:
-                variants = build_target_scoped_query_variants(host_for_q, github_live_query or "", limit=4)
+                variants = build_target_scoped_query_variants(host_for_q, github_live_query or "", limit=8)
                 gh_result = gh.collect_live_multi(
                     variants,
-                    per_page=max(1, min(int(max_results), 30)),
-                    max_total=max(1, min(int(max_results), 30)),
+                    per_page=max(1, min(int(max_results), 40)),
+                    max_total=max(1, min(int(max_results), 40)),
                     target_host=host_for_q,
                 )
             else:
                 gh_result = gh.collect_live(
                     github_live_query or "",
-                    per_page=max(1, min(int(max_results), 30)),
+                    per_page=max(1, min(int(max_results), 40)),
                 )
     elif allow_live_github and not github_live_query:
         gh_result = ProviderCollectResult(
@@ -252,7 +252,7 @@ def run_research(
             RunStatus.COMPLETED_WITH_RESULTS.value,
             RunStatus.PARTIAL.value,
         ):
-            limited = list(result.records)[: max(1, min(int(max_results), 30))]
+            limited = list(result.records)[: max(1, min(int(max_results), 40))]
             if len(result.records) > len(limited):
                 result.coverage_notes = (
                     (result.coverage_notes or "")
@@ -267,7 +267,7 @@ def run_research(
                 started_at=started,
                 ended_at=utc_now_iso(),
                 records_received=len(result.records),
-                records_normalized=min(len(result.records), max(1, min(int(max_results), 30)))
+                records_normalized=min(len(result.records), max(1, min(int(max_results), 40)))
                 if result.status
                 in (
                     RunStatus.COMPLETED_WITH_RESULTS.value,

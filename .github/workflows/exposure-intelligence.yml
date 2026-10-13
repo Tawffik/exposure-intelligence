@@ -31,7 +31,7 @@ on:
         description: "GitHub code-search query (passive index only). Ignored in demo mode."
         required: false
         type: string
-        default: "filename:.env OR filename:.env.example OR extension:map"
+        default: "filename:.env OR filename:.env.production OR filename:.env.local OR extension:map OR filename:wp-config.php OR AKIA OR sk_live_ OR filename:backup.zip"
       max_results:
         description: "Max GitHub code-search results (1–30)."
         required: false

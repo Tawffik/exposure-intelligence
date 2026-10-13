@@ -66,7 +66,7 @@ def run_actions_job(
     db_path: Path,
     research_mode: str = "passive",
     authorization_status: str = "UNKNOWN",
-    github_query: str = "filename:.env OR filename:.env.example OR extension:map",
+    github_query: str = "filename:.env OR filename:.env.production OR filename:.env.local OR extension:map OR filename:wp-config.php OR AKIA OR sk_live_ OR filename:backup.zip",
     max_github_results: int = 10,
     use_demo_fixtures: bool = False,
     profile_path: Optional[Path] = None,
