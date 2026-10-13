@@ -29,6 +29,8 @@ from ei.providers.github_code_search import (
 )
 from ei.providers.urlscan import URLScanProvider
 from ei.evidence_review import review_queue_item
+from ei.candidate_state import attach_states
+from ei.metrics import compute_run_metrics
 from ei.probe import collect_probes
 from ei.ranker import observations_to_candidates
 from ei.store import ResearchStore
@@ -118,7 +120,7 @@ def compare_runs(
             x["url"] or "",
         )
     )
-    return queue
+    return attach_states(queue)
 
 
 def _suggest_next_step(c: Candidate) -> str:
@@ -433,6 +435,7 @@ def run_research(
             "same_mode" if prev_id else ("no_compatible_prior" if mode_key else "unspecified_mode")
         ),
         "research_queue": queue,
+        "yield_metrics": compute_run_metrics({"research_queue": queue, "provider_summaries": [p.to_dict() for p in provider_summaries], "status": report.status, "data_source_label": "", "live_host_requests": live_reqs if enable_probes else 0}),
         "not_in_latest_run": not_observed,
         "summary": {
             "candidates": len(queue),
