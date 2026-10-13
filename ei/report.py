@@ -297,6 +297,11 @@ def write_report_bundle(
 
     p_full = out_dir / "research-result.json"
     p_full.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    ym = result.get("yield_metrics") or {}
+    if ym:
+        p_ym = out_dir / "yield-metrics.json"
+        p_ym.write_text(json.dumps(ym, indent=2), encoding="utf-8")
+        paths["yield-metrics.json"] = p_ym
     paths["research-result.json"] = p_full
 
     try:

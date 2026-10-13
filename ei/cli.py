@@ -102,6 +102,11 @@ def main(argv: list[str] | None = None) -> int:
     ar.add_argument("--commit-sha", default="")
     ar.add_argument("--workflow-run-id", default="")
 
+    pl = sub.add_parser("plan", help="Show research plan for a profile (no network)")
+    pl.add_argument("--profile", type=Path, required=True)
+    pl.add_argument("--max-results", type=int, default=10)
+    pl.add_argument("--enable-probes", action="store_true")
+
     bm = sub.add_parser("benchmark", help="Run classification/evidence-review benchmark corpus")
     bm.add_argument(
         "--corpus",
@@ -251,6 +256,22 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         if result.get("status") in ("PARTIAL", "RATE_LIMITED", "NOT_CONFIGURED"):
             return 3
+        return 0
+
+    if args.command == "plan":
+        from ei.profile import load_profile, validate_profile
+        from ei.planner import plan_research
+        profile = load_profile(args.profile)
+        v = validate_profile(profile)
+        if not v.ok:
+            print(json.dumps({"ok": False, "errors": v.errors}, indent=2))
+            return 2
+        plan = plan_research(
+            profile,
+            max_github_results=args.max_results,
+            enable_probes=bool(args.enable_probes),
+        )
+        print(json.dumps(plan.to_dict(), indent=2))
         return 0
 
     if args.command == "benchmark":
