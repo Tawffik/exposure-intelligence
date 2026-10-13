@@ -326,7 +326,7 @@ class CDXProvider:
         # CDX supports multiple filter params via repeated keys — use urllib list later if needed.
         # Single regex filter on original path:
         if not filter_statuscode:
-            params["filter"] = r"original:.*(\.env|backup\.|dump\.sql|wp-config|\.git/|\.map|openapi|swagger)"|map|bak|tar\.gz|pem)([?#]|$))"
+            params["filter"] = r"original:.*(\.env|backup\.|dump\.sql|wp-config|\.git/|\.map|openapi|swagger)"
         qs = urllib.parse.urlencode(params)
         url = f"{self.api_url}?{qs}"
         headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
