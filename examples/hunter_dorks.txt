@@ -1,0 +1,40 @@
+# Curated high-signal GitHub code-search dork terms for information-disclosure research.
+# Sources: public hunter playbooks (Orwa Atyat map, GitDorker-style lists, 2025 writeups).
+# Usage: human or EI family selection — NOT a guarantee of valid findings.
+# Always AND with target host or org:; always exclude localhost/test noise.
+
+filename:.env
+filename:.env.local
+filename:.env.production
+filename:.env.staging
+filename:wp-config.php
+filename:credentials.json
+filename:id_rsa
+filename:.npmrc
+filename:.git-credentials
+extension:pem
+extension:map
+AKIA
+aws_access_key_id
+AWS_SECRET_ACCESS_KEY
+sk_live_
+sk_test_
+whsec_
+ghp_
+github_pat_
+gho_
+glpat-
+xoxb-
+xoxp-
+npm_
+mongodb+srv
+DB_PASSWORD
+api_key
+client_secret
+private_key
+BEGIN RSA PRIVATE KEY
+firebase
+SENDGRID_API_KEY
+shpat_
+password
+secret

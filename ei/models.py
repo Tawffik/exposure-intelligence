@@ -85,7 +85,10 @@ SECRET_PATTERNS = [
     (re.compile(r"(?i)AKIA[0-9A-Z]{16}"), "aws_access_key_id"),
     (re.compile(r"(?i)-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----"), "private_key_pem"),
     (re.compile(r"(?i)(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}"), "github_token"),
+    (re.compile(r"(?i)github_pat_[A-Za-z0-9_]{20,}"), "github_fine_grained_pat"),
     (re.compile(r"(?i)sk_live_[0-9a-zA-Z]{20,}"), "stripe_live_key"),
+    (re.compile(r"(?i)sk_test_[0-9a-zA-Z]{20,}"), "stripe_test_key"),
+    (re.compile(r"(?i)whsec_[A-Za-z0-9_]{20,}"), "stripe_webhook_secret"),
     (re.compile(r"(?i)xox[baprs]-"), "slack_token"),
     (re.compile(r"(?i)mongodb(\+srv)?://[^\s'\"]+"), "mongodb_uri"),
     (re.compile(r"(?i)glpat-[A-Za-z0-9_\-]{20,}"), "gitlab_pat"),
@@ -94,6 +97,7 @@ SECRET_PATTERNS = [
     (re.compile(r"(?i)eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"), "jwt_like"),
     (re.compile(r"(?i)shpat_[a-f0-9]{32}"), "shopify_access_token"),
     (re.compile(r"(?i)shpca_[a-f0-9]{32}"), "shopify_custom_app_token"),
+    (re.compile(r"(?i)npm_[A-Za-z0-9]{30,}"), "npm_token"),
 ]
 
 
