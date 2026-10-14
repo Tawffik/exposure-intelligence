@@ -1,0 +1,61 @@
+from pathlib import Path
+
+from ei.report import write_report_bundle, _build_human_queue_md
+
+
+def test_human_queue_filters_low_priority(tmp_path: Path):
+    result = {
+        "run_id": "run-1",
+        "target_id": "example.com",
+        "status": "PARTIAL",
+        "summary": {"candidates": 2},
+        "provider_summaries": [
+            {
+                "provider": "github_code_search",
+                "status": "PARTIAL",
+                "records_received": 2,
+                "error_summary": "429 after partial",
+            }
+        ],
+        "research_queue": [
+            {
+                "url": "https://github.com/a/b/.env",
+                "classification": "IMPACT_UNPROVEN",
+                "review_decision": "NEEDS_REVIEW",
+                "change_type": "NEW",
+                "evidence_summary": "path hit",
+                "suggested_next_step": "Open the blob",
+            },
+            {
+                "url": "https://github.com/a/b/.env.example",
+                "classification": "KEYWORD_FALSE_POSITIVE",
+                "review_decision": "LOW_PRIORITY",
+                "change_type": "NEW",
+            },
+        ],
+        "live_host_requests": 0,
+    }
+    paths = write_report_bundle(result, tmp_path, target_host="example.com", research_mode="demo")
+    assert "HUMAN_QUEUE.md" in paths
+    text = (tmp_path / "HUMAN_QUEUE.md").read_text(encoding="utf-8")
+    assert "NEEDS_REVIEW" in text or "https://github.com/a/b/.env" in text
+    assert ".env.example" not in text  # low priority omitted
+    assert "PARTIAL" in text
+    assert "confirmed_vulnerability" in text.lower() or "Confirmed vulnerability" in text
+
+
+def test_empty_human_queue_explains_not_clean():
+    text = _build_human_queue_md(
+        {
+            "run_id": "x",
+            "status": "RATE_LIMITED",
+            "research_queue": [],
+            "provider_summaries": [
+                {"provider": "github_code_search", "status": "RATE_LIMITED", "records_received": 0}
+            ],
+        },
+        research_mode="passive",
+        target_host="t.com",
+    )
+    assert "not" in text.lower() and "clean" in text.lower()
+    assert "RATE_LIMITED" in text

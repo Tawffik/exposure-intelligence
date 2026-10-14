@@ -1,248 +1,96 @@
 # Exposure Intelligence (EI)
 
-Independent, evidence-driven system for discovering, classifying, correlating, and prioritizing **information-disclosure / exposure candidates** on **explicitly authorized** targets.
+**Passive information-disclosure research assistant** for authorized bug-bounty / VDP work.
 
-This repository is the implementation of the [Exposure Intelligence project charter](https://app.notion.com/p/3f6dac31e88081268529d3bec0e16616). It is **not** a fork of BugBountyCI and does not depend on it.
+You enter a target domain in GitHub Actions → EI queries **public indexes only** → you download an artifact → you open **`HUMAN_QUEUE.md`** first.
 
-## Design principles
+---
 
-- **Evidence over inference** — every candidate retains provenance (source, fidelity, timestamps, hashes).
-- **Honest run states** — `ERROR`, `RATE_LIMITED`, `PARTIAL`, `NOT_CONFIGURED`, and `COMPLETED_ZERO` are distinct; failures never look like clean empty success.
-- **Source fidelity** — original observation ≠ AI summary ≠ mirror ≠ independently reproduced.
-- **Explainable classification and ranking** — scores come with reason codes; an exposed artifact is not automatically a vulnerability.
-- **Safety first** — offline fixtures by default; secrets are redacted; no live probing without separate authorization policy (not enabled in MVP).
+## What this is
 
-## Status (v0.5.0)
-
-| Capability | Status |
+| EI does | EI does **not** |
 | --- | --- |
-| Runnable CLI + demo fixture | Implemented |
-| Observation / candidate contracts | Implemented |
-| Source-fidelity labels | Implemented |
-| Honest run states | Implemented |
-| Deterministic content-shape classifier | Implemented + tested |
-| Source maps / directory listings / OpenAPI / git metadata shapes | Implemented + tested |
-| Provenance + redaction | Implemented + tested |
-| Correlation + explainable ranking | Implemented + tested |
-| Automated tests + CI workflow | Implemented |
-| GitHub Actions target-to-report workflow | Implemented |
-| GitHub Code Search provider (fixture + live) | Implemented + tested |
-| URLScan public search provider (fixture + live) | Implemented + tested |
-| Internet Archive CDX provider (fixture + live) | Implemented + tested |
-| Target-scoped queries + relationship labels | Implemented + tested |
-| Mode-compatible history (demo vs passive) | Implemented + tested |
-| SQLite persistence (best-effort Actions cache) | Implemented |
-| Bounded current-state probes (fail-closed ACTIVE) | Implemented + tested |
-| Target registry JSON | Implemented + tested |
-| Classification benchmark CLI + corpus | Implemented (accuracy gate) |
-| Versioned export adapter (ei.export.v1) | Implemented |
-| Evidence review (path vs content) | Implemented + tested |
-| Shared DNS-boundary host attribution (URLScan/CDX/GitHub) | Implemented + tested |
-| Disclosure taxonomy (env/backup/map/api/vcs/diagnostic) | Implemented |
-| Expanded query families + artifact path catalog | Implemented |
+| Search public GitHub code, URLScan, and web archives for **mentions / files** related to a host | Confirm vulnerabilities or production impact |
+| Keep **honest** provider status (`PARTIAL`, `RATE_LIMITED`, `ERROR`) | Replace TruffleHog, Nuclei, or a full recon stack |
+| Triage noise (examples, localhost, third-party noise) | Probe the target host by default |
+| Produce a short **human queue** of leads worth opening | Guarantee bounty payouts |
 
-| max_results = per-provider collection budget | Documented |
+**Sister project for active recon/scan:** [BugBountyCI](https://github.com/Tawffik/BugBountyCI) — do not mix the two.
 
-| Daily scheduler | Not yet (manual workflow_dispatch; charter after probe stability) |
-| Paid indexes (Shodan/FOFA/VT) | Deferred per charter |
+---
 
-## Requirements
+## Operator path (phone / Actions)
 
-- Python 3.10+
-- Optional: `pytest` for tests
+1. Open **Actions** → **Exposure Intelligence Research**
+2. **Run workflow**
+3. Inputs:
+   - `target` = hostname only (e.g. `example.com`)
+   - `research_mode` = `passive` (live indexes) or `demo` (fixtures)
+   - `authorization_status` = usually `UNKNOWN` (no host probing)
+4. Wait for the run → download the artifact
+5. Open **`HUMAN_QUEUE.md` first**
+6. Only if needed: full `research-queue.md`, `provider-status.json`, `export-v1.json`
 
-## Setup
+### How to read `HUMAN_QUEUE.md`
+
+- **0 items** does **not** mean “safe” — check the provider table (rate limits / errors)
+- Each item is a **lead** (`confirmed_vulnerability: false` always)
+- Follow **Safe next step**; do not use any leaked keys
+- Optional secret verification: install TruffleHog locally and use `ei.optional_secret_verify` (off by default)
+
+---
+
+## Architecture (one diagram)
+
+```text
+target host
+    → GitHub Code Search (needs token)
+    → URLScan search (public API)
+    → Internet Archive CDX (public API)
+    → normalize + DNS-boundary attribution
+    → classify + evidence review
+    → HUMAN_QUEUE.md  +  full audit files
+```
+
+Live application-host probes exist in the library behind **ACTIVE** authorization and are **not** enabled by the default Actions workflow.
+
+---
+
+## Local CLI
 
 ```bash
 git clone https://github.com/Tawffik/exposure-intelligence.git
 cd exposure-intelligence
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+
+# Offline demo (fixtures only)
+python -m ei.cli demo -o /tmp/ei-demo
+# then open /tmp/ei-demo/HUMAN_QUEUE.md if present (via Actions path / report bundle)
 ```
 
-## Run the demo
+Tests:
 
 ```bash
-python -m ei.cli demo
-# or after install:
-ei demo
+pytest
 ```
 
-Example (abbreviated) output:
+---
 
-```json
-{
-  "run_id": "...",
-  "status": "COMPLETED_WITH_RESULTS",
-  "metrics": {
-    "observations": 12,
-    "candidates": 12,
-    "potentially_sensitive": 3,
-    "noise_or_low": 7,
-    "redactions_applied": 1
-  },
-  "candidates": [ ... ]
-}
-```
+## Status
 
-Write the full report:
+- **Version:** 0.5.x on `main`
+- **Product stance:** READY_WITH_LIMITATIONS — useful passive triage, not a hunter replacement
+- **Charter / Notion:** research method docs under `docs/`
 
-```bash
-python -m ei.cli demo -o /tmp/ei-report.json
-python -m ei.cli run examples/sample_observations.json -o /tmp/out.json
-```
+### Explicit non-goals
 
+- Autonomous exploitation or key use  
+- Copying BugBountyCI’s full pipeline into this repo  
+- Claiming precision/recall from a small benchmark alone  
 
-
-
-## GitHub Actions (phone-friendly)
-
-1. Open the repo on GitHub → **Actions**
-2. Select **Exposure Intelligence Research**
-3. **Run workflow**
-4. Enter **target** (hostname only, e.g. `example.com`)
-5. Choose **research_mode**: `passive` (live GitHub index if token available) or `demo` (offline fixtures)
-6. Leave **authorization_status** as `UNKNOWN` unless you intentionally document program auth (live host probing remains off in this workflow)
-7. Start the run → open the finished job → download **Artifacts** (`ei-report-<target>-<run_id>`)
-
-Bundle includes: `report.md`, `evidence.json`, `research-queue.md`, `run-diff.*`, `coverage-and-errors.md`, `run-metadata.json`.
-
-Local equivalent:
-
-```bash
-python -m ei.cli actions-run --target example.com --mode demo --out artifacts --db ei_data/research.db
-```
-
-History across Actions runs uses a best-effort cache of `ei_data/` (not guaranteed durable). Reports never treat cache miss as a clean negative.
-
-## Operational workflow (v0.1.5)
-
-```bash
-# 1. Validate program profile
-python -m ei.cli profile-validate examples/program_profile.json
-
-# 2. Research run (offline fixtures; persists to SQLite)
-python -m ei.cli research \
-  --profile examples/program_profile.json \
-  --fixture examples/sample_observations.json \
-  --github-fixture examples/github_code_search_sample.json \
-  --db ei_data/research.db
-
-# 3. History and research queue
-python -m ei.cli history --db ei_data/research.db --target-id demo-program
-python -m ei.cli queue --db ei_data/research.db --target-id demo-program
-
-# Optional live GitHub index only (no target host probing)
-GITHUB_TOKEN=... python -m ei.cli research --profile examples/program_profile.json \
-  --live-github --query 'filename:.env API_KEY' --db ei_data/research.db
-```
-
-Profile gates **live host requests** only. Passive index leads are retained with
-`PUBLIC_INDEX` / `UNATTRIBUTED` relevance labels — never silently dropped.
-
-## Shadow mode — GitHub Code Search (v0.1.2)
-
-Passive public-index provider integrated behind the existing observation contract.
-
-```bash
-# Offline (deterministic; default)
-python -m ei.cli shadow
-
-# Explicit fixtures
-python -m ei.cli shadow \
-  --baseline examples/sample_observations.json \
-  --github-fixture examples/github_code_search_sample.json
-
-# Optional live search (requires GITHUB_TOKEN; does NOT probe discovered hosts)
-GITHUB_TOKEN=... python -m ei.cli shadow --live --query 'filename:.env API_KEY'
-```
-
-Provider failure/rate-limit/empty states are explicit and never erase baseline candidates.
-
-## Input format
-
-Fixture JSON is either a list of observation records or `{"observations": [...]}`.
-
-Each record may include:
-
-| Field | Description |
-| --- | --- |
-| `url` | Discovered URL / artifact reference |
-| `status` | HTTP status if observed |
-| `content_type` | MIME type |
-| `body` | Response body (fixtures only; secrets redacted in output) |
-| `discovery_mode` | `PASSIVE_INDEX` \| `HISTORICAL` \| `CURRENT_OBSERVATION` \| `FIXTURE` |
-| `source_fidelity` | `ORIGINAL` \| `EXTRACTED` \| `SUMMARY` \| `AI_INFERENCE` \| `MIRROR` \| `INDEPENDENTLY_REPRODUCED` |
-| `source_url` / `source_record_id` | Provenance |
-| `scope_decision` | e.g. `IN_SCOPE` |
-| `provider` | Provider name |
-
-## Output contracts
-
-See `ei/models.py` for `Observation`, `Candidate`, `RunReport`, and run-status enums.
-
-**Run statuses:** `NOT_CONFIGURED`, `NOT_RUN`, `SKIPPED_BY_POLICY`, `ERROR`, `RATE_LIMITED`, `PARTIAL`, `COMPLETED_ZERO`, `COMPLETED_WITH_RESULTS`.
-
-**Classifications (examples):** `POTENTIALLY_SENSITIVE`, `SPA_SHELL`, `GENERIC_ERROR`, `AUTH_REQUIRED`, `HISTORICAL_ONLY`, `KEYWORD_FALSE_POSITIVE`, `COPIED_RESEARCH`, …
-
-## Tests
-
-```bash
-pytest -q
-```
-
-Coverage includes positive/negative classification, redaction, provenance, duplicates, historical vs current, zero-result completion, error/rate-limit/partial/not-configured states, and ranking determinism.
-
-## Architecture (MVP)
-
-```
-Fixture / future provider
-        │
-        ▼
-  Observation builder ──► Classifier (content-shape + path + fidelity)
-        │
-        ▼
-  Ranker / correlator ──► Candidate list (explainable scores)
-        │
-        ▼
-  RunReport (status + metrics + provenance)
-```
-
-## Non-goals (MVP)
-
-- No autonomous exploitation or credential use
-- No storage of raw secrets
-- No live HTTP against real targets in this release
-- No claim that classification accuracy is production-validated beyond fixtures
+---
 
 ## License
 
 MIT
-
-## Next bounded tasks
-
-1. Target-profile schema + fail-closed policy gate (still offline)
-2. First passive provider adapter (GitHub code search) behind the same observation contract, shadow mode only
-3. Expand labeled fixture corpus and measure precision denominators
-
-
-## Benchmark (classification quality gate)
-
-```bash
-ei benchmark
-# or: python -m ei.cli benchmark -o /tmp/bench.json
-```
-
-Labeled corpus: `examples/classification_benchmark.json`.
-Exit code 0 only when classification accuracy is 100% on the corpus.
-
-## Target registry
-
-```bash
-ei registry examples/targets_registry.json
-```
-
-## Export bundle
-
-Each Actions/report run writes `export-v1.json` (`schema: ei.export.v1`) for downstream consumers. Candidates are leads — never confirmed findings.
