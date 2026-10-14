@@ -24,3 +24,12 @@ Ideas adapted from public hunter methodology into Exposure Intelligence.
 ## Operator use
 Prefer `org:`-aligned targets and human review of `NEEDS_REVIEW` only.
 Passive indexes remain leads, not confirmed vulnerabilities.
+
+
+## Follow-up (tokens + optional verify)
+
+- Expanded token shapes: github_pat_, whsec_, npm_, glpat-, Stripe test keys.
+- Documentation-like env paths (.env.audit, .env.md) treated as template-like.
+- Reference dork list: examples/hunter_dorks.txt.
+- Optional TruffleHog adapter: ei/optional_secret_verify.py (NOT_CONFIGURED if binary missing; off by default).
+- GitHound-style history dig remains external/manual — not bundled.

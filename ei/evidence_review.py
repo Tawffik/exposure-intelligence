@@ -39,7 +39,7 @@ GENERIC_VALUE_RE = re.compile(
 )
 # Shape-only: long entropy-ish tokens — we never store the match group
 SECRET_LIKE_SHAPE_RE = re.compile(
-    r"(?i)^(?:sk_live_|sk_test_|rk_live_|ghp_|gho_|xox[baprs]-|AKIA[0-9A-Z]{16}|"
+    r"(?i)^(?:sk_live_|sk_test_|rk_live_|ghp_|gho_|github_pat_|whsec_|glpat-|npm_|xox[baprs]-|AKIA[0-9A-Z]{16}|"
     r"eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|-----BEGIN)"
 )
 LONG_TOKEN_RE = re.compile(r"^[A-Za-z0-9/+=_\-.]{16,}$")
@@ -65,6 +65,10 @@ EXAMPLE_PATH_RE = re.compile(
     r"\.env\.dist|"
     r"\.env-sample|"
     r"\.env\.mock|"
+    r"\.env\.audit|"
+    r"\.env\.md|"
+    r"\.env\.txt|"
+    r"env\.audit|"
     r"\.env copy|"
     r"example\.env|"
     r"config\.example|"
