@@ -10,6 +10,108 @@ from ei.models import utc_now_iso
 from ei.export_adapter import build_export_bundle, write_export_bundle
 
 
+
+def _build_human_queue_md(
+    result: dict[str, Any],
+    *,
+    research_mode: str = "",
+    target_host: str = "",
+) -> str:
+    """Operator-facing queue: only NEEDS_REVIEW / POTENTIAL_EXPOSURE_UNCONFIRMED.
+
+    LOW_PRIORITY and noise stay in research-queue.md / export-v1.json for audit.
+    """
+    queue = result.get("research_queue") or []
+    providers = result.get("provider_summaries") or []
+    action = [
+        c
+        for c in queue
+        if (c.get("review_decision") or "")
+        in {"NEEDS_REVIEW", "POTENTIAL_EXPOSURE_UNCONFIRMED"}
+    ]
+    lines = [
+        "# Human review queue",
+        "",
+        "> **This is the only file most operators need.**",
+        "> Low-priority noise is intentionally omitted here (see `research-queue.md`).",
+        "",
+        f"- **Target:** `{target_host or result.get('target_id') or '(unknown)'}`",
+        f"- **Run:** `{result.get('run_id')}`",
+        f"- **Mode:** `{research_mode or result.get('research_mode') or ''}`",
+        f"- **Run status:** `{result.get('status')}`",
+        f"- **Items for human review:** **{len(action)}** (of {len(queue)} total candidates)",
+        "",
+        "## Provider health (read before trusting zeros)",
+        "",
+    ]
+    if not providers:
+        lines.append("_No provider summaries attached._")
+    else:
+        lines.append("| Provider | Status | Received | Notes |")
+        lines.append("| --- | --- | ---: | --- |")
+        for p in providers:
+            note = (p.get("error_summary") or p.get("coverage_notes") or "")[:80].replace("|", "/")
+            lines.append(
+                f"| {p.get('provider')} | {p.get('status')} | "
+                f"{p.get('records_received', 0)} | {note} |"
+            )
+    lines.extend(["", "---", ""])
+    if not action:
+        lines.extend(
+            [
+                "## No high-priority leads in this run",
+                "",
+                "That does **not** mean the target is clean. It may mean:",
+                "- Providers returned only noise / templates / third-party mentions",
+                "- A provider was RATE_LIMITED, PARTIAL, or ERROR (see table above)",
+                "- Budget (`max_results`) was too small",
+                "",
+                "Next: re-run later if rate-limited, or review `research-queue.md` if you want full noise.",
+                "",
+            ]
+        )
+        return "\n".join(lines)
+
+    lines.append("## Leads to open (highest rank first)")
+    lines.append("")
+    for i, item in enumerate(action[:30], 1):
+        hyp = item.get("hypothesis") or {}
+        next_step = (
+            item.get("suggested_next_step")
+            or hyp.get("safe_next_step")
+            or "Human review; no active probing without ACTIVE authorization."
+        )
+        er = item.get("evidence_review") or {}
+        lines.extend(
+            [
+                f"### {i}. {item.get('url') or '(no url)'}",
+                "",
+                f"- **Review:** `{item.get('review_decision')}`",
+                f"- **Classification:** `{item.get('classification')}`",
+                f"- **Change:** `{item.get('change_type')}`",
+                f"- **Relationship:** `{item.get('target_relationship') or er.get('target_relationship') or 'n/a'}`",
+                f"- **Why elevated:** {item.get('evidence_summary') or er.get('review_rationale') or '(see evidence)'}",
+                f"- **Safe next step:** {next_step}",
+                f"- **Confirmed vulnerability:** `false` (always — EI does not confirm)",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "---",
+            "",
+            "## What EI is / is not",
+            "",
+            "- **Is:** passive index leads + honest provider status + triage",
+            "- **Is not:** verified secret scanner, host fuzzer, or bounty guarantee",
+            "- **Verify secrets:** optional external tools (TruffleHog/Gitleaks/GitHound) on a specific repo",
+            "- **Host checks:** only under explicit ACTIVE authorization (separate path / BugBountyCI)",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def write_report_bundle(
     result: dict[str, Any],
     out_dir: Path,
@@ -102,6 +204,12 @@ def write_report_bundle(
     p_rq = out_dir / "research-queue.md"
     p_rq.write_text("\n".join(rq_lines), encoding="utf-8")
     paths["research-queue.md"] = p_rq
+
+    # --- HUMAN_QUEUE.md (operator-first: only items worth human time) ---
+    human = _build_human_queue_md(result, research_mode=research_mode, target_host=target_host)
+    p_hq = out_dir / "HUMAN_QUEUE.md"
+    p_hq.write_text(human, encoding="utf-8")
+    paths["HUMAN_QUEUE.md"] = p_hq
 
     # --- run-diff ---
     new_c = [q for q in queue if q.get("change_type") == "NEW"]
@@ -235,6 +343,7 @@ def write_report_bundle(
             "",
             "## Artifacts in this bundle",
             "",
+            "- **`HUMAN_QUEUE.md` (start here — human-priority leads only)**",
             "- `report.md` (this file)",
             "- `evidence.json`",
             "- `research-queue.md`",
