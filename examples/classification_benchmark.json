@@ -303,5 +303,42 @@
     "body": "DATABASE_URL=postgres://prod_user:s3cretPass@db.internal:5432/app\nSTRIPE_KEY=sk_live_51ExampleNotReal0000\n",
     "discovery_mode": "CURRENT_OBSERVATION",
     "note": "Positive: production-looking env path + secret-like shapes (synthetic values only)"
+  },
+  {
+    "id": "neg_rfc1918_10_env_strong_shape",
+    "family": "noise_localhost",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "LOW_PRIORITY",
+    "url": "http://10.0.0.5/.env",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nAWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n",
+    "discovery_mode": "PASSIVE_INDEX",
+    "target_relationship": "UNATTRIBUTED",
+    "note": "RFC1918 host + secret-like shapes must demote in review (evidence_review regex)"
+  },
+  {
+    "id": "neg_ipv6_loopback_env",
+    "family": "noise_localhost",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "LOW_PRIORITY",
+    "url": "http://[::1]/.env",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "SECRET=local-dev-only-not-production\n",
+    "discovery_mode": "PASSIVE_INDEX",
+    "note": "IPv6 loopback \u2014 review should demote; hypothesis unit-tested separately"
+  },
+  {
+    "id": "pos_public_env_still_actionable",
+    "family": "env_config",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "POTENTIAL_EXPOSURE_UNCONFIRMED",
+    "url": "https://example-authorized.test/config/.env",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nDEBUG=false\n",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Public host counterpart \u2014 remains eligible for review when content supports"
   }
 ]

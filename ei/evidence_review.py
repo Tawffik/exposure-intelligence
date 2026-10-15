@@ -15,6 +15,8 @@ Review decisions:
 
 from __future__ import annotations
 
+from ei.host_safety import is_private_or_local_host
+
 import re
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -228,11 +230,16 @@ def review_candidate(
 
     # Hunter guidance (Orwa et al.): credentials bound to localhost/private IPs
     # are almost never reportable as target production exposure.
+    # Hostname policy via host_safety (RFC1918, ULA, link-local, loopback, localhost);
+    # body regex remains for private IPs mentioned only in snippet text.
     body_l = (body_preview_redacted or "") + " " + (url or "")
-    if PRIVATE_OR_LOCAL_RE.search(body_l) and not basis["example_or_template_path"]:
+    if (
+        is_private_or_local_host(url or "")
+        or PRIVATE_OR_LOCAL_RE.search(body_l)
+    ) and not basis["example_or_template_path"]:
         decision = "LOW_PRIORITY"
         rationale_parts.append(
-            "Snippet/URL references localhost or private RFC1918 address — "
+            "Snippet/URL references localhost or private/special-use address — "
             "typically non-reportable for production scope (hunter playbook)."
         )
     elif basis["evidence_basis"] == "path_only" and not secret_like_keys:

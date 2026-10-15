@@ -1,50 +1,64 @@
 # Engineering Ledger — Exposure Intelligence
 
-## Snapshot (2026-10-15 continuation)
+## Snapshot (2026-10-15 — RFC1918 / IPv6 host-safety continuation)
 
 | Field | Value |
 |-------|-------|
-| main HEAD (verified) | `e936e034` — HUMAN_QUEUE + product README (#14) |
-| Feature branch | `feat/hypothesis-wire-human-queue-quality` |
-| Open PR | [#15](https://github.com/Tawffik/exposure-intelligence/pull/15) — open, not merged |
-| CI on PR #15 base commit | success (run 38678357985) — re-run expected after this push |
-| Notion | BLOCKED_EXTERNAL (no verified write) |
+| main HEAD (verified) | `e936e034` |
+| Feature branch start | `6b4f86f` |
+| Feature branch after this cycle | (see git log on `feat/hypothesis-wire-human-queue-quality`) |
+| Open PR | [#15](https://github.com/Tawffik/exposure-intelligence/pull/15) — **not merged** |
+| Prior CI | 38680059601 success on `6b4f86f` |
+| Notion | NOT UPDATED |
 
-## This cycle — implemented and tested
+## Defect reproduced
 
-### PR #15 review findings
-1. **Defect fixed:** `_safe_next_step` applied path templates (e.g. `.env` → “open the blob”) *before* UNATTRIBUTED/INDEX_ONLY gates, over-promising on third-party hosts. **Order now:** LOW_PRIORITY → localhost → weak attribution → path/token templates.
-2. Hypothesis still separates claim / counter_evidence / missing_evidence; `confirmed_vulnerability` remains False.
-3. Ranking still penalizes INDEX_ONLY/UNATTRIBUTED (×0.55) without dropping candidates; labels aligned to DIRECT_HOST / RELATED_SUBDOMAIN.
-4. `demo -o <dir>` writes full Actions bundle including HUMAN_QUEUE.md.
+`_safe_next_step` only substring-matched `localhost` / `127.0.0.1` / `0.0.0.0`.
 
-### Benchmark v2
-- Corpus expanded **16 → 26** labeled cases across families: env_config, source_maps, git_metadata, backups_listing, openapi, token_shapes, noise_localhost, auth_waf, noise_empty/spa/public.
-- Metrics: review **precision / recall / FPR / FNR** with explicit positive class = `{NEEDS_REVIEW, POTENTIAL_EXPOSURE_UNCONFIRMED}`; **AMBIGUOUS** excluded from denominators.
-- Measured on current fixtures: P=1.0 R=1.0 FPR=0.0 FNR=0.0 (synthetic only — **not** real-world effectiveness).
-- Limitations recorded in report schema_version `2.0`.
+Reproduced (before fix):
+- `http://10.0.0.5/.env` → "Open the public blob…" (wrong)
+- `http://172.16.0.1/.env`, `http://192.168.1.10/.env` → same
+- `http://[::1]/.env`, `http://[fc00::1]/.env`, `http://[fe80::1]/.env` → same
 
-### Regression tests
-- `test_hypothesis_unattributed_overrides_path_template`
-- `test_hypothesis_index_only_before_env_path`
-- `test_benchmark_precision_recall_definitions`
-- Full suite green locally after changes.
+Public path containing `10.0.0.1` as a path segment must **not** be treated as private.
 
-## Verified architecture
-Target → fail-closed profile → query families → passive providers → normalize → DNS-boundary attribution → classify → evidence review → rank → lifecycle/SQLite → HUMAN_QUEUE + export-v1.
+## Policy implemented (`ei/host_safety.py`)
 
-## Residual risks / blockers
-| Item | Status |
-|------|--------|
-| Real-world P/R | Unknown — fixture corpus only |
-| Live provider rate limits | Operational residual |
-| Notion write | External blocker |
-| PR #15 merge | Awaits explicit human authorization |
-| Active probing | Disabled by default; ACTIVE gate only |
+Conservative, explicit (not a single broad `is_private` flag):
+- IPv4 loopback 127/8, unspecified 0.0.0.0
+- RFC1918: 10/8, 172.16/12, 192.168/16
+- IPv6 loopback `::1`, unspecified `::`, ULA `fc00::/7`, link-local `fe80::/10`
+- IPv4-mapped IPv6 of the above
+- `localhost` and `*.localhost`
+- Hostname from `urllib.parse` (bracketed IPv6, ports); **no** path/query substring IP matching
+- Malformed → not private (other gates still apply)
 
-## Merge recommendation for PR #15
-**Recommend merge after CI green on latest commit** — focused operator-quality + benchmark honesty; no provider expansion; no active probing. Do not claim production readiness beyond passive triage.
+Wired into:
+- `ei/hypothesis.py` `_safe_next_step` (gate before path/token templates)
+- `ei/evidence_review.py` review demotion (URL host + body regex)
+
+Precedence remains: LOW_PRIORITY → private/local host → UNATTRIBUTED/OUT_OF_SCOPE/INDEX_ONLY → path templates.
+
+## Benchmark integrity
+
+- Corpus size after private-host fixtures: **29** cases (1 AMBIGUOUS excluded from P/R)
+- Metric definitions unchanged (schema 2.0); tests added for empty corpus, invalid schema, FP/FN adversarial labels, ambiguous exclusion, zero-denominator safety, family denominators
+- Project corpus measured offline: P=1.0 R=1.0 on synthetic fixtures only — **not** real-world effectiveness
+- TP/FP/FN/TN reconcile with labeled_for_review_metrics
+
+## Verification commands (this cycle)
+
+```text
+python -m pytest tests/ -q          # full suite green
+python -m ei.cli demo -o /tmp/ei-host-demo   # HUMAN_QUEUE.md present; INDEX_ONLY next steps attribution-safe
+```
+
+## Remaining limitations
+
+- Real-world precision/recall unknown without independent labeled historical sample
+- No live provider calls in this cycle (by design)
+- PR #15 merge requires explicit human authorization
 
 ## Resume point
-- Branch: `feat/hypothesis-wire-human-queue-quality`
-- Next highest-value independent work after merge: independent labeled historical sample for benchmark; optional one authorized passive live run with per-provider status audit.
+
+Branch `feat/hypothesis-wire-human-queue-quality` — push latest commit after this cycle; leave PR open for review.

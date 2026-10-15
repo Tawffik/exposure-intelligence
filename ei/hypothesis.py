@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ei.host_safety import is_private_or_local_host, local_or_private_next_step_message
+
 
 def _safe_next_step(candidate: dict[str, Any]) -> str:
     """Evidence-typed next steps. Order: demotion gates before path-specific actions.
@@ -22,9 +24,13 @@ def _safe_next_step(candidate: dict[str, Any]) -> str:
     # 1) Explicit low-priority review — stop early
     if review == "LOW_PRIORITY":
         return "Skip unless program policy explicitly values this artifact class."
-    # 2) Local / private host — not production evidence
-    if "localhost" in url or "127.0.0.1" in url or "0.0.0.0" in url:
-        return "Likely local-only credentials — do not report without production host evidence."
+    # 2) Local / private / special-use host — not production evidence
+    # Uses parsed hostname + explicit RFC1918/ULA/link-local/loopback policy
+    # (not unsafe substring matches like "10." in a path).
+    if is_private_or_local_host(url) or is_private_or_local_host(
+        candidate.get("url") or candidate.get("primary_url") or ""
+    ):
+        return local_or_private_next_step_message()
     # 3) Weak attribution before path templates (prevents over-promising on UNATTRIBUTED .env)
     if rel in {"UNATTRIBUTED", "OUT_OF_SCOPE"}:
         return (
