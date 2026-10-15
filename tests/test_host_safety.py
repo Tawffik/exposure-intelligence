@@ -109,3 +109,39 @@ def test_message_helper_stable() -> None:
     msg = local_or_private_next_step_message()
     assert "local-only" in msg.lower() or "private" in msg.lower()
     assert "production" in msg.lower()
+
+
+def test_evidence_review_body_ip_alone_does_not_demote_public_host() -> None:
+    """Docs mentioning 10.x must not be auto-demoted without credential-like evidence."""
+    from ei.evidence_review import review_candidate
+
+    rev = review_candidate(
+        url="https://example.com/api/status",
+        classification="IMPACT_UNPROVEN",
+        reason_codes=["opaque_json"],
+        body_preview_redacted="upstream 10.0.0.5 healthy",
+    )
+    assert rev["review_decision"] != "LOW_PRIORITY" or "private" not in (
+        rev.get("review_rationale") or ""
+    ).lower()
+    # Prefer: not LOW_PRIORITY solely due to body IP
+    assert rev["review_decision"] == "NEEDS_REVIEW"
+
+
+def test_evidence_review_private_host_demotes_without_secrets() -> None:
+    from ei.evidence_review import review_candidate
+
+    rev = review_candidate(
+        url="http://192.168.1.10/status",
+        classification="IMPACT_UNPROVEN",
+        reason_codes=[],
+        body_preview_redacted="ok",
+    )
+    assert rev["review_decision"] == "LOW_PRIORITY"
+
+
+def test_boundary_172_15_and_172_32_not_rfc1918() -> None:
+    assert is_private_or_local_host("http://172.15.255.255/") is False
+    assert is_private_or_local_host("http://172.32.0.1/") is False
+    assert is_private_or_local_host("http://172.16.0.0/") is True
+    assert is_private_or_local_host("http://172.31.255.255/") is True

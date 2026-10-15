@@ -62,3 +62,20 @@ python -m ei.cli demo -o /tmp/ei-host-demo   # HUMAN_QUEUE.md present; INDEX_ONL
 ## Resume point
 
 Branch `feat/hypothesis-wire-human-queue-quality` — push latest commit after this cycle; leave PR open for review.
+
+## Independent audit checkpoint (post-2def63e)
+
+| Evidence | Result |
+|----------|--------|
+| Local/remote feature HEAD | `2def63e` verified identical |
+| PR #15 | open, unmerged, head matches |
+| CI 38680931277 | success on `2def63e` |
+| Host-safety matrix (29 cases incl. 172.15/172.32 boundaries) | all expected outcomes |
+| Body-only RFC1918 mention on public host without credentials | was over-demoting → **fixed**: demote body-IP only with credentialish evidence |
+| Benchmark 29 cases, TP/FP/FN/TN 11/0/0/17 | recomputed, reconciles |
+| Full pytest | green |
+| `confirmed_vulnerability` | remains false |
+| Live targets | none |
+
+Residual non-blocking: synthetic benchmark ≠ real-world P/R; PR description text is stale vs full file list.
+
