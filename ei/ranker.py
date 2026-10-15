@@ -168,8 +168,8 @@ def score_candidate(primary: Observation, group: list[Observation]) -> tuple[flo
     elif scope == "OUT_OF_SCOPE" or rel == "OUT_OF_SCOPE":
         score *= 0.15
         explanation.append("out_of_scope_penalty")
-    elif rel == "DIRECT_TARGET_REFERENCE" or scope == "IN_SCOPE":
-        explanation.append("target_relationship=DIRECT_OR_IN_SCOPE")
+    elif rel in {"DIRECT_HOST", "DIRECT_TARGET_REFERENCE", "RELATED_SUBDOMAIN"} or scope == "IN_SCOPE":
+        explanation.append(f"target_relationship={rel or scope or 'DIRECT_HOST'}")
 
     # Demote example/template paths and path-only elevation without content reasons
     url_l = (primary.discovered_url or "").lower()

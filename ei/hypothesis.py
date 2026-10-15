@@ -13,6 +13,7 @@ def _safe_next_step(candidate: dict[str, Any]) -> str:
     url = (candidate.get("url") or candidate.get("primary_url") or "").lower()
     reasons = " ".join(candidate.get("classification_reason_codes") or []).lower()
     review = candidate.get("review_decision") or ""
+    rel = (candidate.get("target_relationship") or "").upper()
     if review == "LOW_PRIORITY":
         return "Skip unless program policy explicitly values this artifact class."
     if "localhost" in url or "127.0.0.1" in url:
@@ -26,10 +27,25 @@ def _safe_next_step(candidate: dict[str, Any]) -> str:
             "Hunter note: some API keys look informational until capability is understood "
             "(e.g. Identity Toolkit). Document capability only within program rules; no abuse."
         )
-    if ".env" in url or "filename" in reasons:
+    if "source_map" in reasons or url.endswith(".map"):
+        return (
+            "Open the map; check sourcesContent for secrets/internal URLs; "
+            "map any hosts back to program scope before reporting."
+        )
+    if "git_metadata" in reasons or "/.git/" in url:
+        return (
+            "Confirm .git is still reachable only under ACTIVE auth; "
+            "document exposed objects — do not clone aggressively outside program rules."
+        )
+    if ".env" in url or "sensitive_path" in reasons:
         return "Open the public blob, confirm non-example content, map hostnames to program scope."
-    if candidate.get("target_relationship") in {"INDEX_ONLY", "UNATTRIBUTED"}:
-        return "Treat as third-party index hit; verify org/employee ownership before any report."
+    if rel == "UNATTRIBUTED":
+        return (
+            "Host does not match the selected target — verify this is not fixture/third-party "
+            "noise before spending time; only report if ownership is clear."
+        )
+    if rel == "INDEX_ONLY":
+        return "Treat as public-index hit; verify org/employee ownership before any report."
     return "Human review of evidence; no active probing without ACTIVE authorization."
 
 
@@ -79,7 +95,10 @@ def build_hypothesis(candidate: dict[str, Any]) -> dict[str, Any]:
             "Not a confirmed production compromise. Key presence != key impact "
             "(validate capability only under program rules)."
         ),
-        "safe_next_step": candidate.get("suggested_next_step") or _safe_next_step(candidate),
+        # Prefer impact-oriented template; fall back to any pre-set operator step.
+        "safe_next_step": _safe_next_step(candidate)
+        or candidate.get("suggested_next_step")
+        or "Human review of evidence; no active probing without ACTIVE authorization.",
         "authorization_prerequisites": auth_prereq,
         "confirmed_vulnerability": False,
     }

@@ -31,6 +31,7 @@ from ei.providers.github_code_search import (
 from ei.providers.urlscan import URLScanProvider
 from ei.evidence_review import review_queue_item
 from ei.candidate_state import attach_states
+from ei.hypothesis import build_hypothesis
 from ei.metrics import compute_run_metrics
 from ei.probe import collect_probes
 from ei.ranker import observations_to_candidates
@@ -89,7 +90,6 @@ def compare_runs(
             change = "FIRST_SEEN"
         else:
             change = "NEW"
-        next_step = _suggest_next_step(c)
         item = {
             "candidate_id": c.candidate_id,
             "url": c.primary_url,
@@ -103,7 +103,8 @@ def compare_runs(
             "rank_explanation": c.rank_explanation,
             "evidence_summary": c.evidence_summary,
             "source_fidelity": c.source_fidelity,
-            "suggested_next_step": next_step,
+            # Placeholder; replaced by hypothesis-driven step after review.
+            "suggested_next_step": _suggest_next_step(c),
             "review_status": c.review_status,
             "classification_reason_codes": list(
                 getattr(c, "classification_reason_codes", None) or []
@@ -113,18 +114,38 @@ def compare_runs(
             "discovery_mode": getattr(c, "discovery_mode", "") or "",
         }
         # Prefer reason codes from primary observation via evidence_summary parse fallback
-        queue.append(review_queue_item(item))
-    # Prefer actionable reviews; push historical/empty shells to the bottom
+        reviewed = review_queue_item(item)
+        # Structured hypothesis + impact-oriented next step (export already did this;
+        # wire into the operator queue so HUMAN_QUEUE.md is not generic).
+        hyp = build_hypothesis(reviewed)
+        reviewed["hypothesis"] = hyp
+        reviewed["suggested_next_step"] = hyp.get("safe_next_step") or reviewed.get(
+            "suggested_next_step"
+        )
+        queue.append(reviewed)
+    # Prefer actionable reviews; push historical/empty shells to the bottom.
+    # Prefer stronger attribution when rank/review are equal (DIRECT > subdomain > index > unattributed).
     _rev_w = {
         "POTENTIAL_EXPOSURE_UNCONFIRMED": 3,
         "NEEDS_REVIEW": 2,
         "LOW_PRIORITY": 0,
+    }
+    _rel_w = {
+        "DIRECT_HOST": 4,
+        "DIRECT_TARGET_REFERENCE": 4,
+        "DIRECT_OR_IN_SCOPE": 4,
+        "RELATED_SUBDOMAIN": 3,
+        "RELATED_CANDIDATE": 2,
+        "INDEX_ONLY": 1,
+        "UNATTRIBUTED": 0,
+        "OUT_OF_SCOPE": 0,
     }
     _noise_cls = {"EMPTY_RESPONSE", "HISTORICAL_ONLY", "SPA_SHELL", "GENERIC_ERROR"}
     queue.sort(
         key=lambda x: (
             1 if (x.get("classification") or "") in _noise_cls else 0,
             -_rev_w.get(x.get("review_decision") or "", 1),
+            -_rel_w.get((x.get("target_relationship") or "").upper(), 0),
             -(x["rank_score"] or 0),
             x["url"] or "",
         )

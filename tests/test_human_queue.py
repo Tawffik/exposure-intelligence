@@ -59,3 +59,35 @@ def test_empty_human_queue_explains_not_clean():
     )
     assert "not" in text.lower() and "clean" in text.lower()
     assert "RATE_LIMITED" in text
+
+
+def test_research_queue_attaches_hypothesis(tmp_path: Path):
+    """Operator queue must carry structured hypothesis + impact-oriented next step."""
+    from ei.actions_run import run_actions_job
+
+    out = tmp_path / "out"
+    result = run_actions_job(
+        target="example.com",
+        out_dir=out,
+        db_path=tmp_path / "ei.db",
+        research_mode="demo",
+        authorization_status="UNKNOWN",
+        max_github_results=5,
+    )
+    assert result.get("ok") is not False
+    queue = result.get("research_queue") or []
+    actionable = [
+        c
+        for c in queue
+        if (c.get("review_decision") or "") in {"NEEDS_REVIEW", "POTENTIAL_EXPOSURE_UNCONFIRMED"}
+    ]
+    assert actionable, "demo fixtures should produce at least one actionable lead"
+    for item in actionable:
+        hyp = item.get("hypothesis")
+        assert isinstance(hyp, dict), f"missing hypothesis on {item.get('url')}"
+        assert hyp.get("confirmed_vulnerability") is False
+        assert hyp.get("safe_next_step")
+        assert item.get("suggested_next_step")
+    hq = (out / "HUMAN_QUEUE.md").read_text(encoding="utf-8")
+    assert "Attribution legend" in hq or "DIRECT_HOST" in hq
+    assert "Safe next step" in hq
