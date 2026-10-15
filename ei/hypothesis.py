@@ -10,14 +10,33 @@ from typing import Any
 
 
 def _safe_next_step(candidate: dict[str, Any]) -> str:
+    """Evidence-typed next steps. Order: demotion gates before path-specific actions.
+
+    Attribution weakness must not be overridden by a sensitive path name alone.
+    Never implies confirmed vulnerability or authorization to probe.
+    """
     url = (candidate.get("url") or candidate.get("primary_url") or "").lower()
     reasons = " ".join(candidate.get("classification_reason_codes") or []).lower()
     review = candidate.get("review_decision") or ""
     rel = (candidate.get("target_relationship") or "").upper()
+    # 1) Explicit low-priority review — stop early
     if review == "LOW_PRIORITY":
         return "Skip unless program policy explicitly values this artifact class."
-    if "localhost" in url or "127.0.0.1" in url:
+    # 2) Local / private host — not production evidence
+    if "localhost" in url or "127.0.0.1" in url or "0.0.0.0" in url:
         return "Likely local-only credentials — do not report without production host evidence."
+    # 3) Weak attribution before path templates (prevents over-promising on UNATTRIBUTED .env)
+    if rel in {"UNATTRIBUTED", "OUT_OF_SCOPE"}:
+        return (
+            "Host does not match the selected target — verify this is not fixture/third-party "
+            "noise before spending time; only report if ownership is clear."
+        )
+    if rel == "INDEX_ONLY":
+        return (
+            "Public-index hit only; verify org/employee ownership and non-example content "
+            "before any report. Path interest alone is not target ownership."
+        )
+    # 4) Token-shape / family-specific guidance (still non-confirming)
     if "sk_live_" in reasons or "stripe" in reasons:
         return "If authorized: confirm whether any Stripe live key is revoked/scoped; do not use the key."
     if "akia" in reasons or "aws" in reasons:
@@ -39,13 +58,6 @@ def _safe_next_step(candidate: dict[str, Any]) -> str:
         )
     if ".env" in url or "sensitive_path" in reasons:
         return "Open the public blob, confirm non-example content, map hostnames to program scope."
-    if rel == "UNATTRIBUTED":
-        return (
-            "Host does not match the selected target — verify this is not fixture/third-party "
-            "noise before spending time; only report if ownership is clear."
-        )
-    if rel == "INDEX_ONLY":
-        return "Treat as public-index hit; verify org/employee ownership before any report."
     return "Human review of evidence; no active probing without ACTIVE authorization."
 
 

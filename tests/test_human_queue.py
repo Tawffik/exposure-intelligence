@@ -91,3 +91,51 @@ def test_research_queue_attaches_hypothesis(tmp_path: Path):
     hq = (out / "HUMAN_QUEUE.md").read_text(encoding="utf-8")
     assert "Attribution legend" in hq or "DIRECT_HOST" in hq
     assert "Safe next step" in hq
+
+
+def test_hypothesis_unattributed_overrides_path_template():
+    """UNATTRIBUTED must not get path-only 'open the blob' guidance."""
+    from ei.hypothesis import build_hypothesis
+
+    h = build_hypothesis(
+        {
+            "url": "https://evil.test/.env",
+            "classification": "POTENTIALLY_SENSITIVE",
+            "review_decision": "NEEDS_REVIEW",
+            "target_relationship": "UNATTRIBUTED",
+            "classification_reason_codes": ["sensitive_path"],
+        }
+    )
+    assert h["confirmed_vulnerability"] is False
+    step = h["safe_next_step"].lower()
+    assert "does not match" in step or "ownership" in step
+    assert "open the public blob" not in step
+
+
+def test_hypothesis_index_only_before_env_path():
+    from ei.hypothesis import build_hypothesis
+
+    h = build_hypothesis(
+        {
+            "url": "https://github.com/other/repo/blob/main/.env",
+            "classification": "POTENTIALLY_SENSITIVE",
+            "review_decision": "NEEDS_REVIEW",
+            "target_relationship": "INDEX_ONLY",
+            "classification_reason_codes": ["sensitive_path"],
+        }
+    )
+    step = h["safe_next_step"].lower()
+    assert "index" in step or "ownership" in step
+
+
+def test_benchmark_precision_recall_definitions():
+    from pathlib import Path
+    from ei.benchmark import run_classification_benchmark
+
+    r = run_classification_benchmark(Path("examples/classification_benchmark.json"))
+    assert r.total >= 20
+    assert r.ambiguous_excluded >= 1
+    assert r.review_precision is not None
+    assert r.review_recall is not None
+    assert r.schema_version == "2.0"
+    assert r.mismatches == []

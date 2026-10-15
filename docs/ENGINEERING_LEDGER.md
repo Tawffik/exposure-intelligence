@@ -1,54 +1,50 @@
 # Engineering Ledger — Exposure Intelligence
 
-## Snapshot (2026-10-15)
+## Snapshot (2026-10-15 continuation)
 
 | Field | Value |
 |-------|-------|
 | main HEAD (verified) | `e936e034` — HUMAN_QUEUE + product README (#14) |
-| Local branch | `feat/hypothesis-wire-human-queue-quality` @ `e7d5a73` |
-| Open PRs on origin | 0 before this cycle (all #1–#14 merged) |
-| PR #9 host-attribution | **Merged** (closed 2026-10-13) — DNS-boundary in `ei/host_relationship.py` |
-| Tests | Full suite green locally |
-| Notion | BLOCKED_EXTERNAL (no write confirmation in this environment) |
+| Feature branch | `feat/hypothesis-wire-human-queue-quality` |
+| Open PR | [#15](https://github.com/Tawffik/exposure-intelligence/pull/15) — open, not merged |
+| CI on PR #15 base commit | success (run 38678357985) — re-run expected after this push |
+| Notion | BLOCKED_EXTERNAL (no verified write) |
 
-## This cycle — implemented (local + partial remote)
+## This cycle — implemented and tested
 
-1. **Hypothesis on operator queue** (`ei/research.py`): every research-queue item gets `build_hypothesis()`; `suggested_next_step` comes from impact-oriented templates.
-2. **HUMAN_QUEUE quality** (`ei/report.py`): attribution legend; hypothesis line; clearer next steps.
-3. **Next-step templates** (`ei/hypothesis.py`): .env, source maps, git metadata, UNATTRIBUTED vs INDEX_ONLY.
-4. **Queue sort**: attribution strength tie-break (DIRECT > subdomain > index > unattributed).
-5. **demo CLI** (`ei/cli.py`): `-o <directory>` writes full Actions report bundle including `HUMAN_QUEUE.md`.
-6. **Ranker labels** (`ei/ranker.py`): `DIRECT_HOST` / `RELATED_SUBDOMAIN` instead of opaque `DIRECT_OR_IN_SCOPE`.
-7. **Regression**: `test_research_queue_attaches_hypothesis`.
+### PR #15 review findings
+1. **Defect fixed:** `_safe_next_step` applied path templates (e.g. `.env` → “open the blob”) *before* UNATTRIBUTED/INDEX_ONLY gates, over-promising on third-party hosts. **Order now:** LOW_PRIORITY → localhost → weak attribution → path/token templates.
+2. Hypothesis still separates claim / counter_evidence / missing_evidence; `confirmed_vulnerability` remains False.
+3. Ranking still penalizes INDEX_ONLY/UNATTRIBUTED (×0.55) without dropping candidates; labels aligned to DIRECT_HOST / RELATED_SUBDOMAIN.
+4. `demo -o <dir>` writes full Actions bundle including HUMAN_QUEUE.md.
 
-Remote branch has: hypothesis.py, ranker.py, test_human_queue.py (via GitHub connector). research.py / report.py / cli.py may still need a follow-up push if connector payload limits blocked full upload.
+### Benchmark v2
+- Corpus expanded **16 → 26** labeled cases across families: env_config, source_maps, git_metadata, backups_listing, openapi, token_shapes, noise_localhost, auth_waf, noise_empty/spa/public.
+- Metrics: review **precision / recall / FPR / FNR** with explicit positive class = `{NEEDS_REVIEW, POTENTIAL_EXPOSURE_UNCONFIRMED}`; **AMBIGUOUS** excluded from denominators.
+- Measured on current fixtures: P=1.0 R=1.0 FPR=0.0 FNR=0.0 (synthetic only — **not** real-world effectiveness).
+- Limitations recorded in report schema_version `2.0`.
 
-## Verified architecture (actual, not historical)
+### Regression tests
+- `test_hypothesis_unattributed_overrides_path_template`
+- `test_hypothesis_index_only_before_env_path`
+- `test_benchmark_precision_recall_definitions`
+- Full suite green locally after changes.
 
-Target → Profile fail-closed → Planner/query families → Passive providers (GitHub/URLScan/CDX) → Normalize → DNS-boundary attribution → Dedup → Classify → Evidence review → Rank → Lifecycle/SQLite → HUMAN_QUEUE + export-v1 → Actions artifacts.
-
-Probes exist only behind ACTIVE + explicit enable; default Actions path does not probe hosts.
+## Verified architecture
+Target → fail-closed profile → query families → passive providers → normalize → DNS-boundary attribution → classify → evidence review → rank → lifecycle/SQLite → HUMAN_QUEUE + export-v1.
 
 ## Residual risks / blockers
-
 | Item | Status |
 |------|--------|
-| Git `origin` PAT in remote URL | Expired (push via git CLI fails) — use GitHub connector |
+| Real-world P/R | Unknown — fixture corpus only |
+| Live provider rate limits | Operational residual |
 | Notion write | External blocker |
-| Live index rate limits | Operational residual |
-| CDX timeouts | Operational residual |
-| Demo fixtures use `example-authorized.test` | UNATTRIBUTED noise when target is `example.com` (expected for multi-host fixtures) |
+| PR #15 merge | Awaits explicit human authorization |
+| Active probing | Disabled by default; ACTIVE gate only |
 
-## Next highest-value work
-
-1. Finish pushing research.py + report.py + cli.py to the feature branch; merge PR.
-2. Optional: demote pure UNATTRIBUTED fixture hosts harder in demo-only path.
-3. Live Actions run on an authorized target once token/secrets are available.
-4. Notion charter page sync when write access exists.
+## Merge recommendation for PR #15
+**Recommend merge after CI green on latest commit** — focused operator-quality + benchmark honesty; no provider expansion; no active probing. Do not claim production readiness beyond passive triage.
 
 ## Resume point
-
 - Branch: `feat/hypothesis-wire-human-queue-quality`
-- Local commit: `e7d5a73`
-- Patch: `/home/workdir/artifacts/0001-feat-wire-hypothesis-into-operator-queue-impact-orie.patch`
-- Do not force-push main; merge via PR only.
+- Next highest-value independent work after merge: independent labeled historical sample for benchmark; optional one authorized passive live run with per-provider status audit.
