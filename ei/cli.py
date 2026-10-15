@@ -123,6 +123,29 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parents[1]
 
     if args.command == "demo":
+        # Prefer full Actions-style bundle (HUMAN_QUEUE.md) when -o is a directory.
+        if args.output and (args.output.suffix == "" or args.output.is_dir() or not args.output.suffix):
+            out_dir = args.output
+            out_dir.mkdir(parents=True, exist_ok=True)
+            result = run_actions_job(
+                target="example.com",
+                out_dir=out_dir,
+                db_path=out_dir / "ei.db",
+                research_mode="demo",
+                authorization_status="UNKNOWN",
+                max_github_results=10,
+            )
+            public = {
+                "ok": result.get("ok", True) if "error" not in result else False,
+                "status": result.get("status"),
+                "target_host": result.get("target_host"),
+                "run_id": result.get("run_id"),
+                "data_source_label": result.get("data_source_label"),
+                "summary": result.get("summary"),
+                "artifact_paths": result.get("artifact_paths"),
+            }
+            print(json.dumps(public, indent=2))
+            return 0 if public.get("ok") else 1
         fixture = root / "examples" / "sample_observations.json"
         report = run_from_fixture_path(fixture, target_id="demo-target", provider_name="fixture")
         _print_report_summary(report)

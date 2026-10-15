@@ -8,7 +8,8 @@
     "content_type": "text/plain",
     "body": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nDEBUG=true\n",
     "discovery_mode": "CURRENT_OBSERVATION",
-    "note": "Positive: path + secret-like pattern (fixture uses AWS example key shape)"
+    "note": "Positive: path + secret-like pattern (fixture uses AWS example key shape)",
+    "family": "env_config"
   },
   {
     "id": "neg_env_example_placeholder",
@@ -19,7 +20,8 @@
     "content_type": "text/plain",
     "body": "API_KEY=your_api_key_here\nDATABASE_URL=postgres://user:pass@localhost/db\n",
     "discovery_mode": "PASSIVE_INDEX",
-    "note": "Negative: template path + placeholders"
+    "note": "Negative: template path + placeholders",
+    "family": "env_config"
   },
   {
     "id": "neg_public_html",
@@ -30,7 +32,8 @@
     "content_type": "text/html",
     "body": "<html><body><h1>About us</h1><p>Welcome</p></body></html>",
     "discovery_mode": "CURRENT_OBSERVATION",
-    "note": "Negative: ordinary public page"
+    "note": "Negative: ordinary public page",
+    "family": "noise_public"
   },
   {
     "id": "pos_directory_listing",
@@ -41,7 +44,8 @@
     "content_type": "text/html",
     "body": "<title>Index of /uploads/</title><h1>Index of /uploads/</h1><pre><a href=\"backup.zip\">backup.zip</a></pre>",
     "discovery_mode": "CURRENT_OBSERVATION",
-    "note": "Positive shape: directory listing with sensitive name hint"
+    "note": "Positive shape: directory listing with sensitive name hint",
+    "family": "backups_listing"
   },
   {
     "id": "neg_spa_shell",
@@ -52,7 +56,8 @@
     "content_type": "text/html",
     "body": "<div id=\"root\"></div><script>You need to enable JavaScript</script>",
     "discovery_mode": "CURRENT_OBSERVATION",
-    "note": "Negative: SPA fallback"
+    "note": "Negative: SPA fallback",
+    "family": "noise_spa"
   },
   {
     "id": "neg_waf_block",
@@ -63,7 +68,8 @@
     "content_type": "text/html",
     "body": "Attention Required! | Cloudflare<br/>Request blocked",
     "discovery_mode": "CURRENT_OBSERVATION",
-    "note": "WAF/block page (may be 403) is GENERIC_ERROR not AUTH_REQUIRED"
+    "note": "WAF/block page (may be 403) is GENERIC_ERROR not AUTH_REQUIRED",
+    "family": "auth_waf"
   },
   {
     "id": "pos_git_head",
@@ -74,7 +80,8 @@
     "content_type": "text/plain",
     "body": "ref: refs/heads/main\n",
     "discovery_mode": "CURRENT_OBSERVATION",
-    "note": "Git metadata"
+    "note": "Git metadata",
+    "family": "git_metadata"
   },
   {
     "id": "neg_empty_body",
@@ -85,7 +92,8 @@
     "content_type": "text/plain",
     "body": "",
     "discovery_mode": "CURRENT_OBSERVATION",
-    "note": "Empty body"
+    "note": "Empty body",
+    "family": "noise_empty"
   },
   {
     "id": "hist_cdx_backup",
@@ -96,7 +104,8 @@
     "content_type": "application/zip",
     "body": "PK\u0003\u0004fakezip",
     "discovery_mode": "HISTORICAL",
-    "note": "Archive content-type \u2014 sensitive type, impact unproven"
+    "note": "Archive content-type \u2014 sensitive type, impact unproven",
+    "family": "backups_listing"
   },
   {
     "url": "https://github.com/acme/app/blob/main/.env.local.example",
@@ -105,7 +114,8 @@
     "note": "Negative: .env.local.example template",
     "discovery_mode": "PASSIVE_INDEX",
     "id": "neg_env_local_example",
-    "body": "API_KEY=your_key_here\nPASSWORD=changeme"
+    "body": "API_KEY=your_key_here\nPASSWORD=changeme",
+    "family": "env_config"
   },
   {
     "url": "https://example.com/admin",
@@ -113,7 +123,8 @@
     "expected_review": "LOW_PRIORITY",
     "note": "Login page is not disclosure",
     "id": "neg_auth_required",
-    "body": "<form action=\"/login\"><input name=\"password\" type=\"password\"></form>"
+    "body": "<form action=\"/login\"><input name=\"password\" type=\"password\"></form>",
+    "family": "auth_waf"
   },
   {
     "url": "https://example.com/static/app.js.map",
@@ -122,7 +133,8 @@
     "expected_review": "NEEDS_REVIEW",
     "note": "Source map with sourcesContent is a disclosure lead",
     "id": "pos_source_map_with_sources",
-    "body": "{\"version\":3,\"file\":\"app.js\",\"sources\":[\"webpack:///src/secret.js\"],\"mappings\":\"AAAA\",\"sourcesContent\":[\"const key=process.env.SECRET\"]}"
+    "body": "{\"version\":3,\"file\":\"app.js\",\"sources\":[\"webpack:///src/secret.js\"],\"mappings\":\"AAAA\",\"sourcesContent\":[\"const key=process.env.SECRET\"]}",
+    "family": "source_maps"
   },
   {
     "url": "https://example.com/openapi.json",
@@ -131,7 +143,8 @@
     "expected_review": "NEEDS_REVIEW",
     "note": "Public OpenAPI alone is not a vulnerability",
     "id": "pos_openapi_public",
-    "body": "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"API\"},\"paths\":{\"/users\":{\"get\":{}}}}"
+    "body": "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"API\"},\"paths\":{\"/users\":{\"get\":{}}}}",
+    "family": "openapi"
   },
   {
     "id": "neg_403_cloudflare_waf",
@@ -142,7 +155,8 @@
     "content_type": "text/html",
     "body": "<html><title>Attention Required! | Cloudflare</title>cf-error-details Ray ID</html>",
     "discovery_mode": "FIXTURE",
-    "note": "403 WAF block is not AUTH_REQUIRED"
+    "note": "403 WAF block is not AUTH_REQUIRED",
+    "family": "auth_waf"
   },
   {
     "id": "neg_401_login_form",
@@ -153,7 +167,8 @@
     "content_type": "text/html",
     "body": "<html><form method=\"post\" action=\"/login\"><input name=\"password\" type=\"password\"></form></html>",
     "discovery_mode": "FIXTURE",
-    "note": "401 with login form markers"
+    "note": "401 with login form markers",
+    "family": "auth_waf"
   },
   {
     "id": "neg_403_opaque_deny",
@@ -164,6 +179,166 @@
     "content_type": "application/json",
     "body": "{\"error\":\"forbidden\"}",
     "discovery_mode": "FIXTURE",
-    "note": "403 opaque JSON deny without WAF fingerprints"
+    "note": "403 opaque JSON deny without WAF fingerprints",
+    "family": "auth_waf"
+  },
+  {
+    "id": "neg_localhost_env_secret_shape",
+    "family": "noise_localhost",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://127.0.0.1:3000/.env",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nAWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n",
+    "discovery_mode": "PASSIVE_INDEX",
+    "target_relationship": "UNATTRIBUTED",
+    "note": "Negative: secret-like shapes on localhost must demote (hunter playbook)"
+  },
+  {
+    "id": "neg_env_documentation_md",
+    "family": "env_config",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://github.com/acme/docs/blob/main/.env.audit.md",
+    "status": 200,
+    "content_type": "text/markdown",
+    "body": "# Environment audit notes\nDo not commit real secrets. Example: API_KEY=changeme\n",
+    "discovery_mode": "PASSIVE_INDEX",
+    "note": "Negative: documentation/audit markdown about env files [label aligned to classifier+review contract]"
+  },
+  {
+    "id": "pos_backup_sql_dump_name",
+    "family": "backups_listing",
+    "expected_classification": "IMPACT_UNPROVEN",
+    "expected_review": "NEEDS_REVIEW",
+    "url": "https://example-authorized.test/db_backup_2024.sql",
+    "status": 200,
+    "content_type": "application/sql",
+    "body": "-- MySQL dump\nCREATE TABLE users (id INT, email VARCHAR(255));\nINSERT INTO users VALUES (1,'user@example.com');\n",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Positive shape: SQL dump path + body; not confirmed impact [label aligned to classifier+review contract]"
+  },
+  {
+    "id": "neg_placeholder_github_pat_in_readme",
+    "family": "token_shapes",
+    "expected_classification": "UNKNOWN",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://github.com/acme/app/blob/main/README.md",
+    "status": 200,
+    "content_type": "text/markdown",
+    "body": "Set GITHUB_TOKEN=github_pat_XXXXXXXXXXXXXXXXXXXXXXXX in CI. Never commit real tokens.\n",
+    "discovery_mode": "PASSIVE_INDEX",
+    "note": "Negative: placeholder PAT instruction in docs [label aligned to classifier+review contract]"
+  },
+  {
+    "id": "pos_source_map_path_only_ambiguous",
+    "family": "source_maps",
+    "expected_classification": "",
+    "expected_review": "AMBIGUOUS",
+    "ambiguous": true,
+    "url": "https://example.com/static/app.js.map",
+    "status": 200,
+    "content_type": "application/json",
+    "body": "{\"version\":3,\"file\":\"app.js\",\"sources\":[\"app.ts\"],\"mappings\":\"AAAA\"}",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Ambiguous: map without sourcesContent \u2014 may or may not be useful; excluded from P/R"
+  },
+  {
+    "id": "neg_rfc1918_env",
+    "family": "noise_localhost",
+    "expected_classification": "IMPACT_UNPROVEN",
+    "expected_review": "LOW_PRIORITY",
+    "url": "http://10.0.0.5/.env",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "SECRET_KEY=not-a-real-production-secret-for-tests\n",
+    "discovery_mode": "PASSIVE_INDEX",
+    "note": "Negative: RFC1918 host with config-looking body [label aligned to classifier+review contract]"
+  },
+  {
+    "id": "pos_git_config",
+    "family": "git_metadata",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "POTENTIAL_EXPOSURE_UNCONFIRMED",
+    "url": "https://example-authorized.test/.git/config",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "[core]\n\trepositoryformatversion = 0\n[remote \"origin\"]\n\turl = https://github.com/acme/private-app.git\n",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Positive: git config exposure shape"
+  },
+  {
+    "id": "neg_openapi_only_docs_site",
+    "family": "openapi",
+    "expected_classification": "IMPACT_UNPROVEN",
+    "expected_review": "NEEDS_REVIEW",
+    "url": "https://example.com/api/v1/swagger.json",
+    "status": 200,
+    "content_type": "application/json",
+    "body": "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"Public API\",\"version\":\"1\"},\"paths\":{\"/health\":{\"get\":{}}}}",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Public OpenAPI is actionable for review but not a confirmed vuln (IMPACT_UNPROVEN)"
+  },
+  {
+    "id": "neg_malformed_empty_json_body",
+    "family": "noise_empty",
+    "expected_classification": "EMPTY_RESPONSE",
+    "expected_review": "LOW_PRIORITY",
+    "url": "https://example-authorized.test/api/config",
+    "status": 200,
+    "content_type": "application/json",
+    "body": "",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Empty body must not elevate"
+  },
+  {
+    "id": "pos_env_content_supported",
+    "family": "env_config",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "POTENTIAL_EXPOSURE_UNCONFIRMED",
+    "url": "https://example-authorized.test/config/.env.production",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "DATABASE_URL=postgres://prod_user:s3cretPass@db.internal:5432/app\nSTRIPE_KEY=sk_live_51ExampleNotReal0000\n",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Positive: production-looking env path + secret-like shapes (synthetic values only)"
+  },
+  {
+    "id": "neg_rfc1918_10_env_strong_shape",
+    "family": "noise_localhost",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "LOW_PRIORITY",
+    "url": "http://10.0.0.5/.env",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nAWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n",
+    "discovery_mode": "PASSIVE_INDEX",
+    "target_relationship": "UNATTRIBUTED",
+    "note": "RFC1918 host + secret-like shapes must demote in review (evidence_review regex)"
+  },
+  {
+    "id": "neg_ipv6_loopback_env",
+    "family": "noise_localhost",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "LOW_PRIORITY",
+    "url": "http://[::1]/.env",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "SECRET=local-dev-only-not-production\n",
+    "discovery_mode": "PASSIVE_INDEX",
+    "note": "IPv6 loopback \u2014 review should demote; hypothesis unit-tested separately"
+  },
+  {
+    "id": "pos_public_env_still_actionable",
+    "family": "env_config",
+    "expected_classification": "POTENTIALLY_SENSITIVE",
+    "expected_review": "POTENTIAL_EXPOSURE_UNCONFIRMED",
+    "url": "https://example-authorized.test/config/.env",
+    "status": 200,
+    "content_type": "text/plain",
+    "body": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nDEBUG=false\n",
+    "discovery_mode": "CURRENT_OBSERVATION",
+    "note": "Public host counterpart \u2014 remains eligible for review when content supports"
   }
 ]

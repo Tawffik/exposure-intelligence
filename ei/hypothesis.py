@@ -8,15 +8,41 @@ from __future__ import annotations
 
 from typing import Any
 
+from ei.host_safety import is_private_or_local_host, local_or_private_next_step_message
+
 
 def _safe_next_step(candidate: dict[str, Any]) -> str:
+    """Evidence-typed next steps. Order: demotion gates before path-specific actions.
+
+    Attribution weakness must not be overridden by a sensitive path name alone.
+    Never implies confirmed vulnerability or authorization to probe.
+    """
     url = (candidate.get("url") or candidate.get("primary_url") or "").lower()
     reasons = " ".join(candidate.get("classification_reason_codes") or []).lower()
     review = candidate.get("review_decision") or ""
+    rel = (candidate.get("target_relationship") or "").upper()
+    # 1) Explicit low-priority review — stop early
     if review == "LOW_PRIORITY":
         return "Skip unless program policy explicitly values this artifact class."
-    if "localhost" in url or "127.0.0.1" in url:
-        return "Likely local-only credentials — do not report without production host evidence."
+    # 2) Local / private / special-use host — not production evidence
+    # Uses parsed hostname + explicit RFC1918/ULA/link-local/loopback policy
+    # (not unsafe substring matches like "10." in a path).
+    if is_private_or_local_host(url) or is_private_or_local_host(
+        candidate.get("url") or candidate.get("primary_url") or ""
+    ):
+        return local_or_private_next_step_message()
+    # 3) Weak attribution before path templates (prevents over-promising on UNATTRIBUTED .env)
+    if rel in {"UNATTRIBUTED", "OUT_OF_SCOPE"}:
+        return (
+            "Host does not match the selected target — verify this is not fixture/third-party "
+            "noise before spending time; only report if ownership is clear."
+        )
+    if rel == "INDEX_ONLY":
+        return (
+            "Public-index hit only; verify org/employee ownership and non-example content "
+            "before any report. Path interest alone is not target ownership."
+        )
+    # 4) Token-shape / family-specific guidance (still non-confirming)
     if "sk_live_" in reasons or "stripe" in reasons:
         return "If authorized: confirm whether any Stripe live key is revoked/scoped; do not use the key."
     if "akia" in reasons or "aws" in reasons:
@@ -26,10 +52,18 @@ def _safe_next_step(candidate: dict[str, Any]) -> str:
             "Hunter note: some API keys look informational until capability is understood "
             "(e.g. Identity Toolkit). Document capability only within program rules; no abuse."
         )
-    if ".env" in url or "filename" in reasons:
+    if "source_map" in reasons or url.endswith(".map"):
+        return (
+            "Open the map; check sourcesContent for secrets/internal URLs; "
+            "map any hosts back to program scope before reporting."
+        )
+    if "git_metadata" in reasons or "/.git/" in url:
+        return (
+            "Confirm .git is still reachable only under ACTIVE auth; "
+            "document exposed objects — do not clone aggressively outside program rules."
+        )
+    if ".env" in url or "sensitive_path" in reasons:
         return "Open the public blob, confirm non-example content, map hostnames to program scope."
-    if candidate.get("target_relationship") in {"INDEX_ONLY", "UNATTRIBUTED"}:
-        return "Treat as third-party index hit; verify org/employee ownership before any report."
     return "Human review of evidence; no active probing without ACTIVE authorization."
 
 
@@ -79,7 +113,10 @@ def build_hypothesis(candidate: dict[str, Any]) -> dict[str, Any]:
             "Not a confirmed production compromise. Key presence != key impact "
             "(validate capability only under program rules)."
         ),
-        "safe_next_step": candidate.get("suggested_next_step") or _safe_next_step(candidate),
+        # Prefer impact-oriented template; fall back to any pre-set operator step.
+        "safe_next_step": _safe_next_step(candidate)
+        or candidate.get("suggested_next_step")
+        or "Human review of evidence; no active probing without ACTIVE authorization.",
         "authorization_prerequisites": auth_prereq,
         "confirmed_vulnerability": False,
     }

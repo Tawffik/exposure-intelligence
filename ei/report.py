@@ -74,14 +74,28 @@ def _build_human_queue_md(
 
     lines.append("## Leads to open (highest rank first)")
     lines.append("")
+    lines.append(
+        "_Attribution legend:_ `DIRECT_HOST` / subdomain = stronger target link; "
+        "`INDEX_ONLY` = public index (e.g. GitHub) mentioning the host; "
+        "`UNATTRIBUTED` = host not matching target — treat carefully."
+    )
+    lines.append("")
     for i, item in enumerate(action[:30], 1):
         hyp = item.get("hypothesis") or {}
+        if not isinstance(hyp, dict):
+            hyp = {}
         next_step = (
             item.get("suggested_next_step")
             or hyp.get("safe_next_step")
             or "Human review; no active probing without ACTIVE authorization."
         )
         er = item.get("evidence_review") or {}
+        rel = (
+            item.get("target_relationship")
+            or er.get("target_relationship")
+            or "n/a"
+        )
+        claim = (hyp.get("claim") or item.get("impact_hypothesis") or "").strip()
         lines.extend(
             [
                 f"### {i}. {item.get('url') or '(no url)'}",
@@ -89,8 +103,14 @@ def _build_human_queue_md(
                 f"- **Review:** `{item.get('review_decision')}`",
                 f"- **Classification:** `{item.get('classification')}`",
                 f"- **Change:** `{item.get('change_type')}`",
-                f"- **Relationship:** `{item.get('target_relationship') or er.get('target_relationship') or 'n/a'}`",
+                f"- **Relationship:** `{rel}`",
                 f"- **Why elevated:** {item.get('evidence_summary') or er.get('review_rationale') or '(see evidence)'}",
+            ]
+        )
+        if claim:
+            lines.append(f"- **Hypothesis:** {claim[:280]}")
+        lines.extend(
+            [
                 f"- **Safe next step:** {next_step}",
                 f"- **Confirmed vulnerability:** `false` (always — EI does not confirm)",
                 "",

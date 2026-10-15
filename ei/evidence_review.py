@@ -15,6 +15,8 @@ Review decisions:
 
 from __future__ import annotations
 
+from ei.host_safety import is_private_or_local_host
+
 import re
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -228,12 +230,22 @@ def review_candidate(
 
     # Hunter guidance (Orwa et al.): credentials bound to localhost/private IPs
     # are almost never reportable as target production exposure.
+    # 1) URL hostname is private/special-use → always demote (host_safety policy).
+    # 2) Body/snippet mentions private IP alone on a *public* host → demote only when
+    #    credential-like evidence is also present (avoid nuking docs that mention 10.x).
     body_l = (body_preview_redacted or "") + " " + (url or "")
-    if PRIVATE_OR_LOCAL_RE.search(body_l) and not basis["example_or_template_path"]:
+    host_private = is_private_or_local_host(url or "")
+    body_private_mention = bool(PRIVATE_OR_LOCAL_RE.search(body_l))
+    credentialish = bool(secret_like_keys) or basis.get("path_sensitive_name") or any(
+        str(r).startswith("secret_pattern:") for r in (reason_codes or [])
+    )
+    if not basis["example_or_template_path"] and (
+        host_private or (body_private_mention and credentialish)
+    ):
         decision = "LOW_PRIORITY"
         rationale_parts.append(
-            "Snippet/URL references localhost or private RFC1918 address — "
-            "typically non-reportable for production scope (hunter playbook)."
+            "Hostname is private/special-use, or credential-like evidence is bound to "
+            "localhost/RFC1918 text — typically non-reportable for production scope."
         )
     elif basis["evidence_basis"] == "path_only" and not secret_like_keys:
         decision = "LOW_PRIORITY"
