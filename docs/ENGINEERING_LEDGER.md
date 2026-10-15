@@ -79,3 +79,30 @@ Branch `feat/hypothesis-wire-human-queue-quality` — push latest commit after t
 
 Residual non-blocking: synthetic benchmark ≠ real-world P/R; PR description text is stale vs full file list.
 
+
+## Historical Evaluation & Lead Quality (2026-10-15)
+
+| Field | Value |
+|-------|-------|
+| Base (PR #15 head, unmerged) | `e1babee` |
+| Branch | `feat/lead-quality-eval-harness` |
+| PR #15 | still **open / not merged** (no authorization to merge) |
+| Historical labeled leads in-repo | **None found** |
+| Dataset outcome | **C** — harness on synthetic + descriptive demo stats + labeling protocol |
+
+### Baseline (offline, reproducible)
+
+Synthetic benchmark: 29 cases; P/R=1.0/1.0 on fixtures only (TP/FP/FN/TN=11/0/0/17).
+
+Demo descriptive: queue=26; actionable=11 (rate≈0.42); unique URL keys=23; duplicate surplus=3; relationships INDEX_ONLY=8, UNATTRIBUTED=18; confirmed_vulnerability true=0.
+
+### Delivered
+
+- `ei/eval_harness.py` — offline eval
+- `ei.cli eval` — writes JSON + markdown
+- `docs/LEAD_QUALITY_EVAL.md` — protocol and honesty rules
+- `tests/test_eval_harness.py`
+
+### Not done (correctly unavailable)
+
+Real-world precision/recall; independent historical labels; live scans; merge of PR #15.

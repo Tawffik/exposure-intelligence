@@ -116,6 +116,29 @@ def main(argv: list[str] | None = None) -> int:
     )
     bm.add_argument("-o", "--output", type=Path, default=None)
 
+    ev = sub.add_parser(
+        "eval",
+        help="Offline lead-quality evaluation (synthetic + descriptive; no live targets)",
+    )
+    ev.add_argument(
+        "--corpus",
+        type=Path,
+        default=None,
+        help="Benchmark corpus (default: examples/classification_benchmark.json)",
+    )
+    ev.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=Path("artifacts/lead-quality-eval"),
+        help="Output directory for JSON + markdown summary",
+    )
+    ev.add_argument(
+        "--skip-demo",
+        action="store_true",
+        help="Skip demo pipeline descriptive stats",
+    )
+
     reg = sub.add_parser("registry", help="List/validate authorized target registry JSON")
     reg.add_argument("path", type=Path, help="Registry JSON path")
 
@@ -295,6 +318,22 @@ def main(argv: list[str] | None = None) -> int:
             enable_probes=bool(args.enable_probes),
         )
         print(json.dumps(plan.to_dict(), indent=2))
+        return 0
+
+    if args.command == "eval":
+        from ei.eval_harness import run_synthetic_and_descriptive, write_report, write_summary_md
+
+        corpus = args.corpus or (root / "examples" / "classification_benchmark.json")
+        out = args.output
+        out.mkdir(parents=True, exist_ok=True)
+        report = run_synthetic_and_descriptive(
+            benchmark_path=corpus,
+            out_dir=out / "demo_bundle",
+            run_demo_pipeline=not args.skip_demo,
+        )
+        write_report(report, out / "lead_quality_report.json")
+        write_summary_md(report, out / "lead_quality_summary.md")
+        print(json.dumps(report.to_dict(), indent=2))
         return 0
 
     if args.command == "benchmark":
